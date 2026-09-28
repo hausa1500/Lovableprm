@@ -57,10 +57,10 @@
       return;
     }
     if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(value)) {
-      setCard(githubCard, "connected", githubValue, githubState, value, "Repositório detectado", "Repositório detectado");
+      setCard(githubCard, "connected", githubValue, githubState, value, "Repository detected", "Repository detected");
       return;
     }
-    setCard(githubCard, "disconnected", githubValue, githubState, value || "Não conectado", "Não conectado", "Repositório não detectado");
+    setCard(githubCard, "disconnected", githubValue, githubState, value || "Not connected", "Not connected", "Repository not detected");
   }
 
   async function getSupabaseRecord(id) {
@@ -109,9 +109,9 @@
         allowLoading ? "loading" : "unused",
         supabaseValue,
         supabaseState,
-        allowLoading ? "Aguardando projeto" : "Não verificado",
-        allowLoading ? "Verificando..." : "Opcional",
-        allowLoading ? `Aguardando projeto ${globalThis.workspace?.platform === "base44" ? "Base44" : "Lovable"}` : "Supabase ainda não pôde ser verificado",
+        allowLoading ? "Waiting for project" : "Not checked",
+        allowLoading ? "Checking..." : "Optional",
+        allowLoading ? `Waiting for the ${globalThis.workspace?.platform === "base44" ? "Base44" : "Lovable"} project` : "Supabase could not be checked yet",
       );
       return null;
     }
@@ -123,9 +123,9 @@
         allowLoading ? "loading" : "unused",
         supabaseValue,
         supabaseState,
-        allowLoading ? "Verificando..." : "Não verificado",
-        allowLoading ? "Verificando..." : "Opcional",
-        allowLoading ? "Detectando integração Supabase" : "Supabase ainda não pôde ser verificado",
+        allowLoading ? "Checking..." : "Not checked",
+        allowLoading ? "Checking..." : "Optional",
+        allowLoading ? "Detecting Supabase integration" : "Supabase could not be checked yet",
       );
       return null;
     }
@@ -138,11 +138,11 @@
     }
 
     if (supabase.status === "disconnected") {
-      setCard(supabaseCard, "disconnected", supabaseValue, supabaseState, "Não conectado", "Integração com problema", "Há sinais de Supabase, mas a conexão do projeto não pôde ser resolvida");
+      setCard(supabaseCard, "disconnected", supabaseValue, supabaseState, "Not connected", "Integration issue", "Supabase activity was detected, but the project connection could not be resolved");
       return supabase;
     }
 
-    setCard(supabaseCard, "unused", supabaseValue, supabaseState, "Não utilizado", "Opcional", "Este projeto não apresenta sinais de integração Supabase");
+    setCard(supabaseCard, "unused", supabaseValue, supabaseState, "Not used", "Optional", "This project shows no signs of a Supabase integration");
     return supabase;
   }
 
@@ -256,7 +256,7 @@
 
     refreshing = true;
     lastRefreshProjectId = id;
-    setCard(supabaseCard, "loading", supabaseValue, supabaseState, "Verificando...", "Verificando...", "Atualizando integração Supabase");
+    setCard(supabaseCard, "loading", supabaseValue, supabaseState, "Checking...", "Checking...", "Refreshing Supabase integration");
     try {
       const base44 = globalThis.workspace?.platform === "base44" || (typeof workspace !== "undefined" && workspace?.platform === "base44");
       const tabs = await chrome.tabs.query({ url: [base44 ? "https://app.base44.com/apps/*" : "https://lovable.dev/*"] });

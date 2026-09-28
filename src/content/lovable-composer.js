@@ -19,7 +19,7 @@
     if (!uiHost) {
       uiHost = document.createElement("div"); uiHost.id = UI_ID;
       shadow = uiHost.attachShadow({ mode: "open" });
-      shadow.innerHTML = `<style>${css}</style><div class="lb-frame" aria-hidden="true"></div><div class="lb-controls"><button class="lb-btn lb-mode" type="button"><span class="lb-dot"></span><span class="lb-label">LovaRPM</span></button><button class="lb-btn lb-boost" type="button" title="Aprimorar prompt com ChatGPT">✦</button></div><div class="lb-toast" role="status" aria-live="polite"><button class="lb-close" type="button" aria-label="Fechar">×</button><div class="lb-toast-title"><span class="lb-toast-mark"><img src="${TOAST_LOGO_URL}" alt="" aria-hidden="true"></span><span class="lb-toast-heading">LovaRPM</span></div><div class="lb-toast-text"></div></div>`;
+      shadow.innerHTML = `<style>${css}</style><div class="lb-frame" aria-hidden="true"></div><div class="lb-controls"><button class="lb-btn lb-mode" type="button"><span class="lb-dot"></span><span class="lb-label">LovaRPM</span></button><button class="lb-btn lb-boost" type="button" title="Enhance prompt com ChatGPT">✦</button></div><div class="lb-toast" role="status" aria-live="polite"><button class="lb-close" type="button" aria-label="Fechar">×</button><div class="lb-toast-title"><span class="lb-toast-mark"><img src="${TOAST_LOGO_URL}" alt="" aria-hidden="true"></span><span class="lb-toast-heading">LovaRPM</span></div><div class="lb-toast-text"></div></div>`;
       document.documentElement.appendChild(uiHost);
       controls = shadow.querySelector(".lb-controls"); toast = shadow.querySelector(".lb-toast"); frame = shadow.querySelector(".lb-frame");
       shadow.querySelector(".lb-close").addEventListener("click", hideToast);
@@ -49,7 +49,7 @@
     const active = core.active(), mode = shadow.querySelector(".lb-mode"), boostButton = shadow.querySelector(".lb-boost");
     const platformName = core.state.platform === "base44" ? "Base44" : "Lovable";
     mode.dataset.on = String(active); mode.querySelector(".lb-label").textContent = active ? "LovaRPM" : platformName;
-    mode.title = active ? "LovaRPM ativo — seus pedidos são enviados pelo ChatGPT." : `${platformName} direto — seus pedidos serão enviados normalmente ao ${platformName}.`;
+    mode.title = active ? "LovaRPM enabled — your requests are sent through ChatGPT." : `Direct ${platformName} — your requests will be sent directly to ${platformName}.`;
     controls.dataset.active = String(active);
     boostButton.disabled = !core.state.projectId || !core.state.globalEnabled || busy || enhancing;
   }
@@ -100,10 +100,10 @@
     busy = true; renderControls(); decorate(); showToast("sending", "LovaRPM", "Enviando seu pedido...", { loading: true });
     try {
       const response = await chrome.runtime.sendMessage({ type: "LOVABURST_COMPOSER_SUBMIT", objective: text, projectId: core.state.projectId });
-      if (!response?.ok) throw new Error(response?.error || "Não foi possível enviar pela LovaRPM.");
+      if (!response?.ok) throw new Error(response?.error || "Could not submit through LovaRPM.");
       if (core.state.composer?.isConnected && core.read() === text) core.write("");
-      showToast("working", "LovaRPM", "ChatGPT está trabalhando...", { loading: true });
-    } catch (error) { showToast("error", "LovaRPM", error instanceof Error ? error.message : "Não foi possível concluir o envio.", { closable: true, duration: 9000 }); if (core.state.host) core.state.host.dataset.lovaburstStatus = "error"; resetFrameSoon(); }
+      showToast("working", "LovaRPM", "ChatGPT is working...", { loading: true });
+    } catch (error) { showToast("error", "LovaRPM", error instanceof Error ? error.message : "Could not complete the submission.", { closable: true, duration: 9000 }); if (core.state.host) core.state.host.dataset.lovaburstStatus = "error"; resetFrameSoon(); }
     finally { busy = false; renderControls(); decorate(); }
   }
 
@@ -117,7 +117,7 @@
     });
     const enhanced = String(response?.text || "").trim();
     if (!response?.ok || !enhanced) {
-      throw new Error(response?.error || "Não foi possível aprimorar o prompt.");
+      throw new Error(response?.error || "Could not enhance the prompt.");
     }
     return enhanced;
   }
@@ -125,16 +125,16 @@
   async function boost() {
     if (!core.state.composer?.isConnected || enhancing || busy || !core.state.globalEnabled || !core.state.projectId) return;
     const original = core.read();
-    if (!original) { showToast("", "Aprimorar prompt", "Escreva primeiro o que deseja melhorar.", { duration: 3200 }); return; }
+    if (!original) { showToast("", "Enhance prompt", "Escreva primeiro o que deseja melhorar.", { duration: 3200 }); return; }
     enhancing = true; renderControls(); decorate(); showToast("working", "LovaRPM", "Aprimorando seu prompt com ChatGPT...", { loading: true });
     try {
       const enhanced = await enhanceText(original);
       if (core.state.composer?.isConnected && core.read() === original) {
         core.write(enhanced);
-        showToast("done", "Prompt aprimorado", "Revise o texto antes de enviar.", { duration: 4200 });
+        showToast("done", "Enhanced prompt", "Review the text before submitting.", { duration: 4200 });
       }
     } catch (error) {
-      showToast("error", "Aprimorar prompt", error instanceof Error ? error.message : "Não foi possível aprimorar o prompt.", { closable: true, duration: 9000 });
+      showToast("error", "Enhance prompt", error instanceof Error ? error.message : "Could not enhance the prompt.", { closable: true, duration: 9000 });
     } finally {
       enhancing = false; renderControls(); decorate();
     }
@@ -146,10 +146,10 @@
       if (!status || signature === lastStatusSignature) return; lastStatusSignature = signature;
       if (core.state.host) core.state.host.dataset.lovaburstStatus = status;
       if (status === "sending") showToast("sending", "LovaRPM", "Enviando seu pedido...", { loading: true });
-      else if (status === "working") showToast("working", "LovaRPM", "ChatGPT está trabalhando...", { loading: true });
-      else if (status === "done") { showToast("done", "LovaRPM", "Alteração concluída.", { duration: 3800 }); resetFrameSoon(1800); }
-      else if (status === "blocked") { showToast("blocked", "LovaRPM", "A execução precisa da sua atenção.", { closable: true, duration: 10000 }); resetFrameSoon(); }
-      else if (status === "error") { showToast("error", "LovaRPM", "Não foi possível concluir a execução.", { closable: true, duration: 10000 }); resetFrameSoon(); }
+      else if (status === "working") showToast("working", "LovaRPM", "ChatGPT is working...", { loading: true });
+      else if (status === "done") { showToast("done", "LovaRPM", "Change completed.", { duration: 3800 }); resetFrameSoon(1800); }
+      else if (status === "blocked") { showToast("blocked", "LovaRPM", "The task needs your attention.", { closable: true, duration: 10000 }); resetFrameSoon(); }
+      else if (status === "error") { showToast("error", "LovaRPM", "Could not complete the task.", { closable: true, duration: 10000 }); resetFrameSoon(); }
       decorate();
     });
   }
@@ -179,15 +179,15 @@
     const original = String(message.text || "").trim();
     const projectId = String(message.projectId || "").trim();
     if (!original) {
-      sendResponse({ ok: false, error: "Digite uma solicitação antes de aprimorar." });
+      sendResponse({ ok: false, error: "Enter a request before enhancing it." });
       return false;
     }
     if (!projectId || projectId !== core.state.projectId) {
-      sendResponse({ ok: false, error: `O projeto aberto no ${core.state.platform === "base44" ? "Base44" : "Lovable"} não corresponde ao projeto da extensão.` });
+      sendResponse({ ok: false, error: `The open ${core.state.platform === "base44" ? "Base44" : "Lovable"} project does not match the extension project.` });
       return false;
     }
     if (enhancing || busy) {
-      sendResponse({ ok: false, error: "A LovaRPM já está processando outra ação neste projeto." });
+      sendResponse({ ok: false, error: "LovaRPM is already processing another action for this project." });
       return false;
     }
 

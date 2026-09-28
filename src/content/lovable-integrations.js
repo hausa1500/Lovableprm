@@ -294,7 +294,7 @@
         stopAfterContextInvalidation();
         return null;
       }
-      console.warn("[LovaRPM] Falha ao atualizar integrações do projeto:", error);
+      console.warn("[LovaRPM] Failed to refresh project integrations:", error);
       return null;
     }
   }
@@ -312,13 +312,13 @@
     if (message?.type !== "LOVABURST_REFRESH_PROJECT_INTEGRATIONS") return false;
     if (!contextAvailable()) {
       stopAfterContextInvalidation();
-      try { sendResponse({ ok: false, error: "O contexto da extensão foi recarregado. Atualize a página do Lovable." }); } catch {}
+      try { sendResponse({ ok: false, error: "The extension context was reloaded. Refresh the Lovable page." }); } catch {}
       return false;
     }
     const requested = String(message.projectId || "");
     const current = projectId();
     if (requested && current && requested !== current) {
-      try { sendResponse({ ok: false, error: "O projeto Lovable ativo mudou antes da atualização das integrações." }); } catch {}
+      try { sendResponse({ ok: false, error: "The active Lovable project changed before integrations were refreshed." }); } catch {}
       return false;
     }
     void persist(true)
@@ -326,7 +326,7 @@
         try { sendResponse({ ok: true, projectId: current, supabase }); } catch {}
       })
       .catch(() => {
-        try { sendResponse({ ok: false, error: "Não foi possível atualizar as integrações do projeto." }); } catch {}
+        try { sendResponse({ ok: false, error: "Could not refresh project integrations." }); } catch {}
       });
     return true;
   }

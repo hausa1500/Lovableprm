@@ -1,5 +1,3 @@
-import { withSkillInstructions } from "../shared/skill-instructions.js";
-
 const SKILL_IDS = new Set([
   "interface-premium",
   "git-safe",
@@ -134,9 +132,8 @@ async function submit(message, sender) {
     skills: await skills(projectId),
   };
 
-  const preparedPrompt = await globalThis.LovaRPMLicense?.preparePrompt?.("main", payload);
-  if (!preparedPrompt) throw new Error("O servidor não preparou a operação com anexos.");
-  const prompt = withSkillInstructions(preparedPrompt, payload.skills);
+  const prompt = await globalThis.LovaRPMLicense?.preparePrompt?.("main", payload);
+  if (!prompt) throw new Error("O servidor não preparou a operação com anexos.");
   const tab = await chat(projectId);
   const source = sender?.tab?.id ? await chrome.tabs.get(sender.tab.id).catch(() => null) : null;
   const wasActive = Boolean(tab.active);
@@ -168,7 +165,6 @@ async function submit(message, sender) {
     const dispatched = await chrome.tabs.sendMessage(tab.id, {
       type: "LOVABURST_SUBMIT_TO_CHATGPT",
       prompt,
-      implementationTask: true,
     });
     if (!dispatched?.ok) {
       throw new Error(dispatched?.error || "O ChatGPT não confirmou o envio da mensagem.");

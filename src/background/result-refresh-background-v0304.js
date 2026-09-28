@@ -51,10 +51,10 @@ async function scanResult(tabId, projectId) {
 
 async function refreshVisibleChatGptResult(projectId) {
   const id = String(projectId || "").trim();
-  if (!id) throw new Error("Projeto não informado.");
+  if (!id) throw new Error("Project not specified.");
   const conversation = await activeProjectConversation(id);
   const tab = await resolveChatTab(conversation);
-  if (!tab?.id) throw new Error("A conversa vinculada do ChatGPT não está disponível.");
+  if (!tab?.id) throw new Error("The linked ChatGPT conversation is unavailable.");
 
   try {
     const response = await scanResult(tab.id, id);

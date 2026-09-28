@@ -120,7 +120,7 @@
           return await new Promise((resolve) => {
             const recognition = new Recognition();
             window.__LOVABURST_SPEECH_RECOGNITION__ = recognition;
-            recognition.lang = "pt-BR";
+            recognition.lang = "en-US";
             recognition.continuous = false;
             recognition.interimResults = true;
             let transcript = "";
@@ -161,7 +161,7 @@
       event.preventDefault();
       const tab = await lovableTab();
       if (!tab?.id) {
-        show("Abra o projeto no Lovable antes de usar o microfone.");
+        show("Open the project in Lovable before using the microphone.");
         return;
       }
 
@@ -190,16 +190,16 @@
 
         const error = String(result?.error || "");
         if (error === "NotAllowedError" || error === "service-not-allowed" || error === "not-allowed") {
-          show("Acesso ao microfone bloqueado no Lovable. Verifique a permissão do site e tente novamente.");
+          show("Microphone access is blocked on Lovable. Check the site permission and try again.");
         } else if (error === "NotFoundError" || error === "audio-capture") {
-          show("Nenhum microfone disponível foi encontrado.");
+          show("No microphone was found.");
         } else if (error === "unsupported-media" || error === "unsupported-speech") {
-          show("O navegador não disponibilizou ditado por voz nesta página.");
+          show("Voice dictation is unavailable on this page.");
         } else if (error !== "aborted" && error !== "no-speech") {
-          show("Não foi possível iniciar o ditado por voz.");
+          show("Could not start voice dictation.");
         }
       } catch (error) {
-        show(error instanceof Error ? error.message : "Não foi possível iniciar o ditado por voz.");
+        show(error instanceof Error ? error.message : "Could not start voice dictation.");
       } finally {
         listening = false;
         button.dataset.listening = "false";
@@ -227,8 +227,8 @@
     settings: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.5-2.5 1a7 7 0 0 0-1.7-1L14.4 3h-4.8L9.3 6a7 7 0 0 0-1.7 1L5.1 6 3 9.5 5.1 11a7 7 0 0 0 0 2L3 14.5 5.1 18l2.5-1a7 7 0 0 0 1.7 1l.3 3h4.8l.3-3a7 7 0 0 0 1.7-1l2.5 1 2-3.5-2-1.5a7 7 0 0 0 .1-1Z"/></svg>'
   };
   const specs = [
-    ['hideLovableBadgeButton','badge','Remover marca d’água'],
-    ['downloadProjectButton','download','Baixar projeto'],
+    ['hideLovableBadgeButton','badge','Remove watermark'],
+    ['downloadProjectButton','download','Download project'],
     ['createProjectButton','create','Criar Projeto'],
     ['analyzeProjectButton','analyze','Analisar Projeto'],
     ['settingsButton','settings','Ajustes']

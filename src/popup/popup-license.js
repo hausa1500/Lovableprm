@@ -3,7 +3,7 @@
     const status = {
       valid: true,
       code: "active",
-      message: "Licença ativa.",
+      message: "License active.",
       customer: "Unlocked",
       serial: "LVBRPM-UNLOCK-UNLOCK-UNLOCK",
       expiresAt: null,
@@ -23,7 +23,7 @@
 })();
 (() => {
   const licenseMeta = document.querySelector(".license-meta");
-  if (licenseMeta) licenseMeta.textContent = "A ativação é vinculada a esta instalação. O serial é validado online no Servidor.";
+  if (licenseMeta) licenseMeta.textContent = "Activation is tied to this installation. The serial is validated online by the server.";
   const gate = document.getElementById("licenseGate");
   const shell = document.querySelector(".app-shell");
   const form = document.getElementById("licenseForm");
@@ -63,7 +63,7 @@
     if (name) name.textContent = status.customer || stored.lovarpmLicenseCustomerName || "—";
     if (expiryValue) {
       const date = status.expiresAt ? new Date(status.expiresAt) : null;
-      expiryValue.textContent = status.lifetime ? "Vitalício" : date && !Number.isNaN(date.getTime()) ? date.toLocaleString("pt-BR", { dateStyle:"short", timeStyle:"short" }) : "—";
+      expiryValue.textContent = status.lifetime ? "Lifetime" : date && !Number.isNaN(date.getTime()) ? date.toLocaleString("en-US", { dateStyle:"short", timeStyle:"short" }) : "—";
     }
     if (statusValue) {
       statusValue.textContent = status.grace ? "OFFLINE" : "ATIVO";
@@ -72,7 +72,7 @@
   };
 
   const showLocked = (_status) => {
-    const unlocked = { valid:true, code:"active", message:"Licença ativa.", customer:"Unlocked", serial:"LVBRPM-UNLOCK-UNLOCK-UNLOCK", lifetime:true, expiresAt:null, skills:["*"], checkedAt:Date.now() };
+    const unlocked = { valid:true, code:"active", message:"License active.", customer:"Unlocked", serial:"LVBRPM-UNLOCK-UNLOCK-UNLOCK", lifetime:true, expiresAt:null, skills:["*"], checkedAt:Date.now() };
     lastStatus = unlocked;
     renderLicenseSummary(unlocked);
     if (shell) shell.dataset.licenseLocked = "false";
@@ -87,7 +87,7 @@
   };
 
   async function loadStatus(force = false) {
-    const unlocked = { valid:true, code:"active", message:"Licença ativa.", customer:"Unlocked", serial:"LVBRPM-UNLOCK-UNLOCK-UNLOCK", lifetime:true, expiresAt:null, skills:["*"], checkedAt:Date.now() };
+    const unlocked = { valid:true, code:"active", message:"License active.", customer:"Unlocked", serial:"LVBRPM-UNLOCK-UNLOCK-UNLOCK", lifetime:true, expiresAt:null, skills:["*"], checkedAt:Date.now() };
     try {
       const response = await chrome.runtime.sendMessage({ type:"LOVARPM_LICENSE_STATUS", force });
       showUnlocked(response?.status?.valid ? response.status : unlocked);
@@ -100,44 +100,44 @@
     event.preventDefault();
     const key = String(input?.value || "").replace(/\s+/g, "").toUpperCase();
     const customer = String(customerNameInput?.value || "").normalize("NFKC").replace(/\s+/g, " ").trim();
-    if (!customer) return setFeedback("Informe o nome do cliente.");
+    if (!customer) return setFeedback("Enter the customer name.");
     if (!/^LVBRPM-[A-HJ-NP-Z2-9]{5}-[A-HJ-NP-Z2-9]{5}-[A-HJ-NP-Z2-9]{5}$/.test(key)) return setFeedback("Use um serial no formato LVBRPM-XXXXX-XXXXX-XXXXX.");
     button.disabled = true;
     await chrome.storage.local.set({ lovarpmLicenseCustomerName:customer });
-    setFeedback("Validando licença no Supabase…", "warning");
+    setFeedback("Validating the license with Supabase…", "warning");
     try {
       const response = await chrome.runtime.sendMessage({ type:"LOVARPM_LICENSE_ACTIVATE", key, customer });
-      if (response?.status?.valid) { setFeedback("Licença ativada com sucesso.", "success"); setTimeout(() => showUnlocked(response.status), 250); }
-      else showLocked(response?.status || { message:response?.error || "Não foi possível ativar a licença." });
-    } catch { setFeedback("Não foi possível conectar ao servidor de licenças."); }
+      if (response?.status?.valid) { setFeedback("License activated successfully.", "success"); setTimeout(() => showUnlocked(response.status), 250); }
+      else showLocked(response?.status || { message:response?.error || "Could not activate the license." });
+    } catch { setFeedback("Could not connect to the license server."); }
     finally { button.disabled = false; }
   });
 
   resetButton?.addEventListener("click", async () => {
     const key = String(input?.value || "").replace(/\s+/g, "").toUpperCase();
     const customer = String(customerNameInput?.value || "").normalize("NFKC").replace(/\s+/g, " ").trim();
-    if (!customer) return setFeedback("Informe o nome do cliente para resetar a ativação.");
+    if (!customer) return setFeedback("Enter the customer name to reset activation.");
     if (!/^LVBRPM-[A-HJ-NP-Z2-9]{5}-[A-HJ-NP-Z2-9]{5}-[A-HJ-NP-Z2-9]{5}$/.test(key)) return setFeedback("Use um serial no formato LVBRPM-XXXXX-XXXXX-XXXXX.");
     resetButton.disabled = true;
     if (button) button.disabled = true;
     await chrome.storage.local.set({ lovarpmLicenseCustomerName:customer });
-    setFeedback("Resetando ativação e transferindo para este computador…", "warning");
+    setFeedback("Resetting activation and transferring it to this computer…", "warning");
     try {
       const response = await chrome.runtime.sendMessage({ type:"LOVARPM_LICENSE_RESET", key, customer });
       if (response?.status?.valid) {
         const remaining = Number.isInteger(response.status.resetsRemaining) ? response.status.resetsRemaining : null;
         const suffix = remaining === null ? "" : ` Restam ${remaining} reset${remaining === 1 ? "" : "s"} nesta janela de 24 horas.`;
-        setFeedback(`Ativação resetada. Este computador foi ativado e o computador anterior foi bloqueado.${suffix}`, "success");
+        setFeedback(`Activation reset. This computer is now activated and the previous computer has been blocked.${suffix}`, "success");
         setTimeout(() => showUnlocked(response.status), 650);
       } else {
-        const status = response?.status || { message:response?.error || "Não foi possível resetar a ativação." };
+        const status = response?.status || { message:response?.error || "Could not reset activation." };
         if (status?.code === "reset_limit" && status?.retryAt) {
           const retry = new Date(status.retryAt);
-          if (!Number.isNaN(retry.getTime())) status.message = `Limite de 2 resets em 24 horas atingido. Tente novamente após ${retry.toLocaleString("pt-BR")}.`;
+          if (!Number.isNaN(retry.getTime())) status.message = `Limite de 2 resets em 24 horas atingido. Tente novamente após ${retry.toLocaleString("en-US")}.`;
         }
         showLocked(status);
       }
-    } catch { setFeedback("Não foi possível conectar ao servidor de licenças."); }
+    } catch { setFeedback("Could not connect to the license server."); }
     finally {
       resetButton.disabled = false;
       if (button) button.disabled = false;

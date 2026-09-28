@@ -13,7 +13,7 @@ async function refreshIntegrationTabs(reason) {
         .map((tab) => chrome.tabs.reload(tab.id)),
     );
   } catch (error) {
-    console.warn("[LovaRPM] Não foi possível recarregar as abas após instalação/atualização:", error);
+    console.warn("[LovaRPM] Could not reload tabs after installation or update:", error);
   }
 }
 

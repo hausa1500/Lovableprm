@@ -1,5 +1,4 @@
 import { getConfig, setConfig } from "../shared/storage.js";
-import { getPromptSkillIds, withSkillInstructions } from "../shared/skill-instructions.js";
 
 const CHATGPT_URL_PATTERNS = ["https://chatgpt.com/*"];
 const CHATGPT_BRIDGE_FILE = "src/content/chatgpt.js";
@@ -173,7 +172,6 @@ async function sendPromptMessage(tabId, prompt) {
   return chrome.tabs.sendMessage(tabId, {
     type: "LOVABURST_SUBMIT_TO_CHATGPT",
     prompt,
-    implementationTask: true,
   });
 }
 
@@ -374,9 +372,8 @@ async function relayPromptToChatGpt(payload, sourceTabId = null) {
     throw new Error("ChatGPT não está vinculado. Abra o painel da LovaRPM e vincule uma conversa do ChatGPT.");
   }
 
-  const preparedPrompt = await globalThis.LovaRPMLicense?.preparePrompt?.("main", payload);
-  if (!preparedPrompt) throw new Error("O servidor não preparou a operação.");
-  const prompt = withSkillInstructions(preparedPrompt, payload.skills);
+  const prompt = await globalThis.LovaRPMLicense?.preparePrompt?.("main", payload);
+  if (!prompt) throw new Error("O servidor não preparou a operação.");
   let sourceTab = null;
   let activatedChatForDispatch = false;
 
@@ -489,12 +486,6 @@ async function handleCapturedPrompt(message, sender) {
     lovableProjectId = workspace.lovableProjectId || lovableProjectId;
   }
 
-  let fallbackSkills;
-  if (!Object.prototype.hasOwnProperty.call(payload, "skills") && lovableProjectId) {
-    const stored = await chrome.storage.local.get("projectSkillSelections");
-    fallbackSkills = stored.projectSkillSelections?.[lovableProjectId];
-  }
-
   const bootstrap = await accessBootstrapState(lovableProjectId);
 
   const pendingPrompt = {
@@ -508,7 +499,7 @@ async function handleCapturedPrompt(message, sender) {
     repositoryDetectionSource,
     lovableProjectId,
     apiDiagnostics: Array.isArray(payload.apiDiagnostics) ? payload.apiDiagnostics.slice(-24) : [],
-    skills: getPromptSkillIds(payload, fallbackSkills),
+    skills: Array.isArray(payload.skills) ? payload.skills.slice(0, 42) : [],
     accessBootstrap: bootstrap.required ? "REQUIRED" : "",
     accessBootstrapKey: bootstrap.key || "",
     status: "captured",

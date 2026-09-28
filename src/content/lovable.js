@@ -351,7 +351,7 @@
 
   async function activateProjectChat(workspace) {
     const projectId = workspace?.lovableProjectId || "";
-    if (!projectId) throw new Error("Não foi possível identificar o projeto Lovable.");
+    if (!projectId) throw new Error("Could not identify the Lovable project.");
 
     const stored = await chrome.storage.local.get("projectChatBindings");
     const record = stored.projectChatBindings?.[projectId];
@@ -361,7 +361,7 @@
 
     if (!conversation?.tabId) {
       throw new Error(
-        "Este projeto ainda não possui uma conversa ativa do ChatGPT. Abra o painel da LovaRPM e vincule ou crie uma conversa.",
+        "This project does not have an active ChatGPT conversation yet. Open the LovaRPM panel and link or create a conversation.",
       );
     }
 
@@ -373,7 +373,7 @@
     if (!response?.ok) {
       throw new Error(
         response?.error ||
-          "A conversa deste projeto não está disponível. Abra o painel da LovaRPM e selecione outra conversa.",
+          "This project conversation is unavailable. Open the LovaRPM panel and select another conversation.",
       );
     }
   }
@@ -388,7 +388,7 @@
     }
 
     button.disabled = true;
-    button.textContent = "Detectando projeto…";
+    button.textContent = "Detecting project…";
 
     try {
       const workspace = await resolveWorkspace();
@@ -412,7 +412,7 @@
         },
       });
 
-      if (!response?.ok) throw new Error(response?.error || "Falha ao enviar o prompt.");
+      if (!response?.ok) throw new Error(response?.error || "Could not submit the prompt.");
 
       button.dataset.state = "sent";
       button.textContent = workspace.repository ? `Enviado · ${workspace.repository} ✓` : "Enviado ao ChatGPT ✓";
@@ -420,13 +420,13 @@
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const needsChat =
-        message.includes("ainda não possui uma conversa ativa do ChatGPT") ||
-        message.includes("conversa deste projeto não está disponível");
+        message.includes("does not have an active ChatGPT conversation yet") ||
+        message.includes("this project conversation is unavailable");
 
       if (needsChat) {
         button.dataset.state = "needs-chat";
         button.textContent = "Conecte o ChatGPT";
-        button.title = "Abra o painel da LovaRPM para criar ou conectar uma conversa a este projeto.";
+        button.title = "Open the LovaRPM panel to create or link a conversation to this project.";
         window.setTimeout(() => resetButton(button), 4200);
         return;
       }
@@ -434,7 +434,7 @@
       button.dataset.state = "error";
       button.textContent = "Falha no envio";
       button.title = message;
-      console.error("[LovaRPM] Falha inesperada ao enviar o prompt:", error);
+      console.error("[LovaRPM] Unexpected error while submitting the prompt:", error);
       window.setTimeout(() => resetButton(button), 2600);
     }
   }
@@ -532,7 +532,7 @@
         : [];
 
       if (!objective) {
-        sendResponse({ ok: false, error: "Digite o que você quer alterar." });
+        sendResponse({ ok: false, error: "Enter what you want to change." });
         return false;
       }
 
@@ -560,7 +560,7 @@
           });
 
           if (!response?.ok) {
-            throw new Error(response?.error || "Falha ao enviar o prompt.");
+            throw new Error(response?.error || "Could not submit the prompt.");
           }
 
           return response;

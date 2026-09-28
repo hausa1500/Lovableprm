@@ -18,8 +18,8 @@
   const phaseMap = {
     sending: [1, "Enviando"],
     working: [2, "Processando"],
-    done: [4, "Concluído"],
-    blocked: [2, "Ação necessária"],
+    done: [4, "Completed"],
+    blocked: [2, "Action required"],
     error: [2, "Erro"],
   };
 

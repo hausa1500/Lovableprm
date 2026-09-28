@@ -16,7 +16,7 @@
 
   const zone = document.createElement("div");
   zone.className = "lb-attachment-zone";
-  zone.innerHTML = '<div class="lb-attachment-list" hidden></div><button class="lb-attach-button" type="button" title="Anexar arquivo" aria-label="Anexar arquivo">📎 <span>Anexar</span></button><input class="lb-file-input" type="file" multiple hidden>';
+  zone.innerHTML = '<div class="lb-attachment-list" hidden></div><button class="lb-attach-button" type="button" title="Attach file" aria-label="Attach file">📎 <span>Attach</span></button><input class="lb-file-input" type="file" multiple hidden>';
   input.closest(".editor")?.insertAdjacentElement("afterend", zone);
 
   const list = zone.querySelector(".lb-attachment-list");
@@ -66,7 +66,7 @@
     if (sending || !selected.length) return;
     const activeWorkspace = getWorkspace();
     if (!activeWorkspace?.lovableProjectId) {
-      if (typeof showFeedback === "function") showFeedback(`Abra o projeto do ${activeWorkspace?.platform === "base44" ? "Base44" : "Lovable"} que você quer alterar.`);
+      if (typeof showFeedback === "function") showFeedback(`Open the ${activeWorkspace?.platform === "base44" ? "Base44" : "Lovable"} project you want to change.`);
       return;
     }
     sending = true;
@@ -82,7 +82,7 @@
         url: activeWorkspace.sourceUrl || "",
         title: activeWorkspace.sourceTitle || ""
       });
-      if (!response?.ok) throw new Error(response?.error || "Não foi possível enviar os anexos.");
+      if (!response?.ok) throw new Error(response?.error || "Could not send the attachments.");
       input.value = "";
       while (selected.length) attachmentsApi.release(selected.pop());
       render();

@@ -214,7 +214,7 @@ async function renderHistory() {
   const items = rawItems.filter((item, index) => index === 0 || String(item?.text || "") !== String(rawItems[index - 1]?.text || "")).slice(0, 50);
   list.replaceChildren();
   if (!items.length) { const empty = document.createElement("p"); empty.className = "history-empty"; empty.textContent = "As solicitações enviadas para este projeto aparecerão aqui."; list.append(empty); return; }
-  for (const item of items) { const row = document.createElement("article"); row.className = "history-item"; const text = document.createElement("p"); text.textContent = String(item?.text || ""); const time = document.createElement("time"); const date = item?.createdAt ? new Date(item.createdAt) : null; time.textContent = date && !Number.isNaN(date.valueOf()) ? date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : ""; row.append(text, time); list.append(row); }
+  for (const item of items) { const row = document.createElement("article"); row.className = "history-item"; const text = document.createElement("p"); text.textContent = String(item?.text || ""); const time = document.createElement("time"); const date = item?.createdAt ? new Date(item.createdAt) : null; time.textContent = date && !Number.isNaN(date.valueOf()) ? date.toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" }) : ""; row.append(text, time); list.append(row); }
 }
 
 function active(rec) {

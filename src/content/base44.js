@@ -73,14 +73,14 @@
     const stored = await chrome.storage.local.get("projectChatBindings");
     const record = stored.projectChatBindings?.[current.lovableProjectId];
     const conversation = record?.conversations?.find((item) => item.id === record.activeConversationId);
-    if (!conversation?.tabId) throw new Error("Este projeto ainda não possui uma conversa ativa do ChatGPT. Abra o painel da LovaRPM e conecte uma conversa.");
+    if (!conversation?.tabId) throw new Error("This project does not have an active ChatGPT conversation yet. Open the LovaRPM panel and link a conversation.");
     const response = await chrome.runtime.sendMessage({ type: "LOVABURST_LINK_CHATGPT", tabId: conversation.tabId });
-    if (!response?.ok) throw new Error(response?.error || "A conversa vinculada não está disponível.");
+    if (!response?.ok) throw new Error(response?.error || "The linked conversation is unavailable.");
   }
 
   async function submitObjective(objective, skills) {
     const current = await workspace();
-    if (!current.lovableProjectId) throw new Error("Não foi possível identificar o aplicativo Base44.");
+    if (!current.lovableProjectId) throw new Error("Could not identify the Base44 app.");
     await rememberObjective(current, objective);
     await activateChat(current);
     const response = await chrome.runtime.sendMessage({
@@ -88,7 +88,7 @@
       source: SOURCE,
       payload: { text: objective, url: location.href, title: document.title, capturedAt: new Date().toISOString(), repository: current.repository, lovableProjectId: current.lovableProjectId, platform: SOURCE, repositoryDetectionSource: current.detectionSource, skills },
     });
-    if (!response?.ok) throw new Error(response?.error || "Falha ao enviar o pedido.");
+    if (!response?.ok) throw new Error(response?.error || "Could not submit the request.");
   }
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -104,7 +104,7 @@
     if (message?.type === "LOVABURST_SUBMIT_OBJECTIVE") {
       const objective = String(message.objective || "").trim();
       const skills = Array.isArray(message.skills) ? message.skills.filter((item) => typeof item === "string").slice(0, 42) : [];
-      if (!objective) { sendResponse({ ok: false, error: "Digite o que você quer alterar." }); return false; }
+      if (!objective) { sendResponse({ ok: false, error: "Enter what you want to change." }); return false; }
       submitObjective(objective, skills).then(() => sendResponse({ ok: true })).catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) }));
       return true;
     }

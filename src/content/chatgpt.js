@@ -4,7 +4,6 @@
   window.__LOVABURST_CHATGPT_BRIDGE__ = true;
 
   const SOURCE = "chatgpt";
-  const PRM_WRAPPER = `[PRM_WRAPPER]\n\nExecute the user's request accurately and completely.\nInspect before changing. Preserve existing functionality and explicit requirements.\nMake the smallest safe changes necessary.\nVerify and repair task-caused errors before finishing.\nThe user's request is the source of truth; do not override it.\n\nFINAL RESPONSE:\nBriefly report what changed, key files, and validations actually performed.\n\nFinish with exactly one status:\n[PRM_DONE]\n[PRM_BLOCKED]\n[PRM_ERROR]`;
   const COMPOSER_SELECTORS = [
     "#prompt-textarea",
     'textarea[data-testid="prompt-textarea"]',
@@ -239,10 +238,7 @@
     const composer = await waitForComposer();
     if (!composer) return { ok: false, error: "Campo de mensagem do ChatGPT não encontrado." };
 
-    const originalPrompt = prompt.trim();
-    const normalizedPrompt = options.implementationTask === true && !originalPrompt.startsWith(PRM_WRAPPER)
-      ? `${PRM_WRAPPER}\n\n${originalPrompt}`
-      : originalPrompt;
+    const normalizedPrompt = prompt.trim();
     const baseline = countUserMessages();
     setComposerText(composer, normalizedPrompt);
     await sleep(normalizedPrompt.length >= LARGE_PROMPT_THRESHOLD ? 180 : 120);
@@ -658,7 +654,7 @@
       }
 
       busy = true;
-      submitPrompt(message.prompt, { implementationTask: message.implementationTask === true })
+      submitPrompt(message.prompt)
         .then(sendResponse)
         .catch((error) => sendResponse({ ok: false, error: String(error) }))
         .finally(() => {

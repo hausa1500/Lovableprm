@@ -94,7 +94,7 @@ async function waitChat(tabId, timeout = 20000) {
 
 async function newConversation(options = {}) {
   const projectId = workspace.lovableProjectId;
-  if (!projectId) throw new Error(`Abra um projeto do ${workspace.platform === "base44" ? "Base44" : "Lovable"} primeiro.`);
+  if (!projectId) throw new Error(`Open a ${workspace.platform === "base44" ? "Base44" : "Lovable"} project first.`);
   const initialPrompt = String(options.initialPrompt || "").trim();
 
   if (!initialPrompt) await collectHandoffFromActiveConversation();

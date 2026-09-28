@@ -40,7 +40,7 @@
 
   async function activateRelay(tabId) {
     const response = await chrome.runtime.sendMessage({ type: "LOVABURST_LINK_CHATGPT", tabId });
-    if (!response?.ok) throw new Error(response?.error || "Não foi possível ativar esta conversa.");
+    if (!response?.ok) throw new Error(response?.error || "Could not activate this conversation.");
   }
 
   function closePicker(result, resolve, overlay) {
@@ -50,7 +50,7 @@
 
   async function chooseChatTab(projectId) {
     const tabs = await chatTabs();
-    if (!tabs.length) throw new Error("Nenhuma conversa do ChatGPT está aberta.");
+    if (!tabs.length) throw new Error("No ChatGPT conversations are open.");
 
     const all = await bindings();
     const ownership = new Map();
@@ -66,7 +66,7 @@
       overlay.className = "lb-chat-picker";
       overlay.setAttribute("role", "dialog");
       overlay.setAttribute("aria-modal", "true");
-      overlay.innerHTML = '<section class="lb-chat-picker-panel"><header><div><span>// CHATGPT</span><strong>Trocar conversa</strong><p>Escolha a conversa que ficará exclusiva deste projeto.</p></div><button type="button" data-close aria-label="Fechar">×</button></header><div class="lb-chat-picker-list"></div><button type="button" class="lb-chat-picker-cancel" data-close>Cancelar</button></section>';
+      overlay.innerHTML = '<section class="lb-chat-picker-panel"><header><div><span>// CHATGPT</span><strong>Switch conversation</strong><p>Choose which conversation to dedicate to this project.</p></div><button type="button" data-close aria-label="Close">×</button></header><div class="lb-chat-picker-list"></div><button type="button" class="lb-chat-picker-cancel" data-close>Cancel</button></section>';
 
       const list = overlay.querySelector(".lb-chat-picker-list");
       for (const tab of tabs) {
@@ -80,9 +80,9 @@
         const title = document.createElement("strong");
         title.textContent = tab.title || "ChatGPT";
         const url = document.createElement("span");
-        url.textContent = tab.url === "https://chatgpt.com/" ? "Nova conversa ainda sem URL própria" : String(tab.url || "");
+        url.textContent = tab.url === "https://chatgpt.com/" ? "New conversation does not have its own URL yet" : String(tab.url || "");
         const state = document.createElement("small");
-        state.textContent = unavailable ? "Exclusiva de outro projeto" : (tab.active ? "Aba ativa" : "Disponível");
+        state.textContent = unavailable ? "Dedicated to another project" : (tab.active ? "Active tab" : "Available");
         option.append(title, url, state);
 
         if (!unavailable) option.addEventListener("click", () => closePicker(tab, resolve, overlay));
@@ -98,17 +98,17 @@
   }
 
   async function bindSelectedConversation(projectId, tab) {
-    if (!tab?.id || !tab.url?.startsWith("https://chatgpt.com/")) throw new Error("Conversa inválida.");
-    if (tab.url === "https://chatgpt.com/") throw new Error("Abra uma conversa específica do ChatGPT antes de vinculá-la.");
+    if (!tab?.id || !tab.url?.startsWith("https://chatgpt.com/")) throw new Error("Invalid conversation.");
+    if (tab.url === "https://chatgpt.com/") throw new Error("Open a specific ChatGPT conversation before linking it.");
 
     const all = await bindings();
     for (const [ownerProjectId, rec] of Object.entries(all)) {
       if (ownerProjectId === projectId) continue;
       const used = (rec?.conversations || []).some((item) => String(item.lockedUrl || item.url || "") === tab.url);
-      if (used) throw new Error("Essa conversa já está exclusiva de outro projeto.");
+      if (used) throw new Error("This conversation is already dedicated to another project.");
     }
 
-    if (!(await ensureBridge(tab.id))) throw new Error("A ponte da LovaRPM não respondeu nesta conversa.");
+    if (!(await ensureBridge(tab.id))) throw new Error("The LovaRPM bridge did not respond in this conversation.");
 
     const rec = all[projectId] || {
       projectId,
@@ -162,14 +162,14 @@
 
   async function handleSwitch(button) {
     const projectId = currentProjectId();
-    if (!projectId) throw new Error(`Abra um projeto do ${globalThis.workspace?.platform === "base44" ? "Base44" : "Lovable"} primeiro.`);
+    if (!projectId) throw new Error(`Open a ${globalThis.workspace?.platform === "base44" ? "Base44" : "Lovable"} project first.`);
     button.disabled = true;
     try {
       const selected = await chooseChatTab(projectId);
       if (!selected) return;
       await bindSelectedConversation(projectId, selected);
       if (typeof refreshChat === "function") await refreshChat();
-      if (typeof showFeedback === "function") showFeedback("Conversa selecionada e travada exclusivamente para este projeto.", "success");
+      if (typeof showFeedback === "function") showFeedback("Conversation selected and exclusively linked to this project.", "success");
     } finally {
       button.disabled = false;
     }
