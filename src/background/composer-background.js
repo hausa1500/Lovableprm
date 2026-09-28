@@ -1,4 +1,6 @@
 
+import { withSkillInstructions } from "../shared/skill-instructions.js";
+
 const PROJECT_SKILLS_KEY = "projectSkillSelections";
 const PROJECT_CHATS_KEY = "projectChatBindings";
 const CHATGPT_ENHANCE_BRIDGE = "src/content/chatgpt-enhance.js";
@@ -176,8 +178,9 @@ async function enhanceComposerPrompt(message, sender) {
 
   const skills = await selectedSkills(projectId);
   const platform = sender?.tab?.url?.startsWith("https://app.base44.com/") ? "base44" : "lovable";
-  const prompt = await globalThis.LovaRPMLicense?.preparePrompt?.("enhance", { text, lovableProjectId: projectId, platform, repository: String(message.repository || ""), title: String(message.title || sender?.tab?.title || ""), skills });
-  if (!prompt) throw new Error("O servidor não preparou o aprimoramento.");
+  const preparedPrompt = await globalThis.LovaRPMLicense?.preparePrompt?.("enhance", { text, lovableProjectId: projectId, platform, repository: String(message.repository || ""), title: String(message.title || sender?.tab?.title || ""), skills });
+  if (!preparedPrompt) throw new Error("O servidor não preparou o aprimoramento.");
+  const prompt = withSkillInstructions(preparedPrompt, skills);
   const sourceTab = await resolveLovableSourceTab(projectId, sender?.tab || null);
   const chatWasActive = Boolean(tab.active);
 

@@ -1,3 +1,5 @@
+import { withSkillInstructions } from "../shared/skill-instructions.js";
+
 const SKILL_IDS = new Set([
   "interface-premium",
   "git-safe",
@@ -132,8 +134,9 @@ async function submit(message, sender) {
     skills: await skills(projectId),
   };
 
-  const prompt = await globalThis.LovaRPMLicense?.preparePrompt?.("main", payload);
-  if (!prompt) throw new Error("O servidor não preparou a operação com anexos.");
+  const preparedPrompt = await globalThis.LovaRPMLicense?.preparePrompt?.("main", payload);
+  if (!preparedPrompt) throw new Error("O servidor não preparou a operação com anexos.");
+  const prompt = withSkillInstructions(preparedPrompt, payload.skills);
   const tab = await chat(projectId);
   const source = sender?.tab?.id ? await chrome.tabs.get(sender.tab.id).catch(() => null) : null;
   const wasActive = Boolean(tab.active);
