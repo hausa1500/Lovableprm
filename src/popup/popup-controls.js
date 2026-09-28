@@ -39,20 +39,20 @@
       pauseCheckButton.hidden = false;
       pauseCheckButton.dataset.paused = String(autoCheckPaused);
       pauseCheckButton.textContent = autoCheckPaused ? "▶" : "⏸";
-      pauseCheckButton.title = autoCheckPaused ? "Retomar checagem automática" : "Pausar checagem automática";
+      pauseCheckButton.title = autoCheckPaused ? "Resume automatic checks" : "Pause automatic checks";
       pauseCheckButton.setAttribute("aria-label", pauseCheckButton.title);
     }
     if (autoCheckPaused) {
       countdown.hidden = false;
-      countdown.textContent = "checagem pausada";
-      countdown.title = "A checagem automática do ChatGPT está pausada.";
+      countdown.textContent = "checks paused";
+      countdown.title = "Automatic ChatGPT checks are paused.";
       return;
     }
     const elapsed = Math.floor((Date.now() - anchor) / 1000);
     const remaining = checkSeconds - (elapsed % checkSeconds);
     countdown.hidden = false;
-    countdown.textContent = remaining <= 1 ? "checando…" : `checa em ${remaining}s`;
-    countdown.title = `Próxima verificação do ChatGPT · intervalo ${checkSeconds}s`;
+    countdown.textContent = remaining <= 1 ? "checking…" : `checks in ${remaining}s`;
+    countdown.title = `Next ChatGPT check · every ${checkSeconds}s`;
   }
 
   async function getCheckConfig() {
@@ -81,10 +81,10 @@
     panel.className = "lb-settings-panel";
     panel.hidden = true;
     const options = CHECK_INTERVALS.map((seconds) => {
-      const label = seconds < 60 ? `${seconds} segundos` : `${seconds / 60} ${seconds === 60 ? "minuto" : "minutos"}`;
-      return `<option value="${seconds}">${label}${seconds === DEFAULT_CHECK_SECONDS ? " · Padrão" : ""}</option>`;
+      const label = seconds < 60 ? `${seconds} seconds` : `${seconds / 60} ${seconds === 60 ? "minute" : "minutes"}`;
+      return `<option value="${seconds}">${label}${seconds === DEFAULT_CHECK_SECONDS ? " · Default" : ""}</option>`;
     }).join("");
-    panel.innerHTML = `<div class="lb-settings-head"><div><span>// AJUSTES</span><strong>Preferências da LovaRPM</strong></div><button id="lbSettingsClose" type="button" aria-label="Fechar ajustes">×</button></div><label class="lb-settings-field"><span>Verificar resultado do ChatGPT</span><small>Define de quanto em quanto tempo a LovaRPM checa o resultado durante uma solicitação ativa.</small><select id="lbCheckInterval">${options}</select></label>`;
+    panel.innerHTML = `<div class="lb-settings-head"><div><span>// SETTINGS</span><strong>LovaRPM preferences</strong></div><button id="lbSettingsClose" type="button" aria-label="Close settings">×</button></div><label class="lb-settings-field"><span>Check ChatGPT results</span><small>Choose how often LovaRPM checks for a result while a request is active.</small><select id="lbCheckInterval">${options}</select></label>`;
     footer?.before(panel);
     const replacement = settingsButton.cloneNode(true);
     settingsButton.replaceWith(replacement);
@@ -122,7 +122,7 @@
   function compactFeedback() {
     if (!feedback) return;
     const text = String(feedback.textContent || "").trim();
-    const temporary = /^(Dados atualizados\.|Enviado ao ChatGPT\.)$/i.test(text);
+    const temporary = /^(Data updated\.|Sent to ChatGPT\.|Dados atualizados\.|Enviado ao ChatGPT\.)$/i.test(text);
     feedback.classList.toggle("lb-feedback-temporary", temporary);
     if (feedbackTimer) clearTimeout(feedbackTimer);
     if (temporary && !feedback.hidden) {
@@ -163,24 +163,24 @@
     const text = String(input?.value || "").trim();
     if (!text) {
       input?.focus();
-      if (typeof showFeedback === "function") showFeedback("Digite um pedido antes de aprimorar o prompt.");
+      if (typeof showFeedback === "function") showFeedback("Enter a request before enhancing the prompt.");
       return;
     }
     const projectId = String(globalThis.workspace?.lovableProjectId || (typeof workspace !== "undefined" ? workspace?.lovableProjectId : "") || "");
     const repository = String(globalThis.workspace?.repository || (typeof workspace !== "undefined" ? workspace?.repository : "") || "");
     const title = String(globalThis.workspace?.sourceTitle || (typeof workspace !== "undefined" ? workspace?.sourceTitle : "") || "");
     if (!projectId) {
-      if (typeof showFeedback === "function") showFeedback(`Abra um projeto do ${globalThis.workspace?.platform === "base44" ? "Base44" : "Lovable"} antes de aprimorar o prompt.`);
+      if (typeof showFeedback === "function") showFeedback(`Open a ${globalThis.workspace?.platform === "base44" ? "Base44" : "Lovable"} project before enhancing the prompt.`);
       return;
     }
 
     button.disabled = true;
     button.dataset.loading = "true";
     button.dataset.enhancing = "true";
-    button.title = "Aprimorando prompt…";
+    button.title = "Enhancing prompt…";
     const idleMarkup = button.innerHTML;
     const iconMarkup = button.querySelector("svg")?.outerHTML || "✦";
-    button.innerHTML = `${iconMarkup}<span class="lb-tool-label">Aprimorando...</span>`;
+    button.innerHTML = `${iconMarkup}<span class="lb-tool-label">Enhancing...</span>`;
     const pulseAnimation = button.animate(
       [{ opacity: 0.72, transform: "scale(1)" }, { opacity: 1, transform: "scale(1.04)" }, { opacity: 0.72, transform: "scale(1)" }],
       { duration: 1200, iterations: Infinity, easing: "ease-in-out" },
@@ -189,20 +189,20 @@
     let timeoutId = null;
     try {
       const timeout = new Promise((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error("O ChatGPT demorou demais para devolver o prompt aprimorado.")), timeoutMs);
+        timeoutId = setTimeout(() => reject(new Error("ChatGPT took too long to return the enhanced prompt.")), timeoutMs);
       });
       const response = await Promise.race([
         chrome.runtime.sendMessage({ type: "LOVABURST_ENHANCE_PROMPT", text, projectId, repository, title }),
         timeout,
       ]);
       const enhanced = String(response?.text || "").trim();
-      if (!response?.ok || !enhanced) throw new Error(response?.error || "O ChatGPT não devolveu um prompt aprimorado.");
+      if (!response?.ok || !enhanced) throw new Error(response?.error || "ChatGPT did not return an enhanced prompt.");
       input.value = enhanced;
       dispatchInput();
       input.focus();
       input.setSelectionRange?.(input.value.length, input.value.length);
       button.dataset.success = "true";
-      if (typeof showFeedback === "function") showFeedback("Prompt aprimorado.");
+      if (typeof showFeedback === "function") showFeedback("Prompt enhanced.");
       setTimeout(() => { delete button.dataset.success; }, 900);
     } catch (error) {
       if (typeof showFeedback === "function") showFeedback(error instanceof Error ? error.message : String(error));
@@ -213,7 +213,7 @@
       button.disabled = false;
       button.dataset.loading = "false";
       button.dataset.enhancing = "false";
-      button.title = "Aprimorar prompt";
+      button.title = "Enhance prompt";
     }
   }
 
@@ -229,7 +229,7 @@
     const Recognition = globalThis.SpeechRecognition || globalThis.webkitSpeechRecognition;
     if (!Recognition) {
       button.disabled = true;
-      button.title = "Ditado não suportado neste navegador";
+      button.title = "Dictation is not supported in this browser";
       button.dataset.supported = "false";
       return;
     }
@@ -242,7 +242,7 @@
     recognition.onstart = () => {
       listening = true;
       button.dataset.listening = "true";
-      button.title = "Ouvindo... Clique para parar";
+      button.title = "Listening... Click to stop";
       speechBaseText = String(input?.value || "");
     };
 
@@ -260,15 +260,15 @@
     recognition.onerror = (event) => {
       const code = String(event?.error || "");
       if (typeof showFeedback !== "function") return;
-      if (code === "not-allowed" || code === "service-not-allowed") showFeedback("Permissão do microfone não concedida.");
-      else if (code === "audio-capture") showFeedback("Microfone indisponível.");
-      else if (code !== "aborted" && code !== "no-speech") showFeedback("Não foi possível usar o ditado por voz.");
+      if (code === "not-allowed" || code === "service-not-allowed") showFeedback("Microphone permission was not granted.");
+      else if (code === "audio-capture") showFeedback("Microphone unavailable.");
+      else if (code !== "aborted" && code !== "no-speech") showFeedback("Could not use voice dictation.");
     };
 
     recognition.onend = () => {
       listening = false;
       button.dataset.listening = "false";
-      button.title = "Ditado por voz";
+      button.title = "Voice dictation";
       updateClearState();
     };
 
@@ -293,19 +293,19 @@
 
     if (!connectedCard.hidden) {
       pill.dataset.state = "connected";
-      pill.title = "ChatGPT conectado";
-      pill.setAttribute("aria-label", "ChatGPT conectado");
+      pill.title = "ChatGPT connected";
+      pill.setAttribute("aria-label", "ChatGPT connected");
       return;
     }
     if (!setupCard.hidden) {
       pill.dataset.state = "disconnected";
-      pill.title = "ChatGPT não conectado";
-      pill.setAttribute("aria-label", "ChatGPT não conectado");
+      pill.title = "ChatGPT not connected";
+      pill.setAttribute("aria-label", "ChatGPT not connected");
       return;
     }
     pill.dataset.state = "checking";
-    pill.title = "Verificando conexão...";
-    pill.setAttribute("aria-label", "Verificando conexão com o ChatGPT");
+    pill.title = "Checking connection...";
+    pill.setAttribute("aria-label", "Checking connection to ChatGPT");
   }
 
   function buildComposer() {
@@ -331,8 +331,8 @@
     enhanceButton.id = "lbEnhancePromptButton";
     enhanceButton.className = "lb-tool-button lb-enhance-button";
     enhanceButton.type = "button";
-    enhanceButton.title = "Aprimorar prompt";
-    enhanceButton.setAttribute("aria-label", "Aprimorar prompt");
+    enhanceButton.title = "Enhance prompt";
+    enhanceButton.setAttribute("aria-label", "Enhance prompt");
     enhanceButton.textContent = "✦";
 
     const chatIndicator = document.createElement("button");
@@ -346,16 +346,16 @@
     micButton.id = "lbMicButton";
     micButton.className = "lb-tool-button lb-mic-button";
     micButton.type = "button";
-    micButton.title = "Ditado por voz";
-    micButton.setAttribute("aria-label", "Ditado por voz");
+    micButton.title = "Voice dictation";
+    micButton.setAttribute("aria-label", "Voice dictation");
     micButton.textContent = "🎙";
 
     const clearButton = document.createElement("button");
     clearButton.id = "lbClearComposerButton";
     clearButton.className = "lb-tool-button lb-clear-button";
     clearButton.type = "button";
-    clearButton.title = "Limpar solicitação";
-    clearButton.setAttribute("aria-label", "Limpar solicitação");
+    clearButton.title = "Clear request";
+    clearButton.setAttribute("aria-label", "Clear request");
     clearButton.textContent = "🗑";
 
     editor.parentNode.insertBefore(shell, editor);
@@ -367,23 +367,23 @@
 
     if (attachButton) {
       attachButton.classList.add("lb-tool-button");
-      attachButton.title = "Anexar arquivo";
-      attachButton.setAttribute("aria-label", "Anexar arquivo");
+      attachButton.title = "Attach file";
+      attachButton.setAttribute("aria-label", "Attach file");
       toolbar.appendChild(attachButton);
     }
     toolbar.appendChild(enhanceButton);
     toolbar.appendChild(chatIndicator);
     toolbar.appendChild(micButton);
     sendButton.classList.add("lb-toolbar-send");
-    sendButton.title = "Enviar solicitação";
-    sendButton.setAttribute("aria-label", "Enviar solicitação");
+    sendButton.title = "Send request";
+    sendButton.setAttribute("aria-label", "Send request");
     toolbar.appendChild(sendButton);
     toolbar.appendChild(clearButton);
     shell.appendChild(toolbar);
     attachmentZone.remove();
 
     if (input) {
-      input.placeholder = "Digite sua solicitação...";
+      input.placeholder = "Enter your request...";
       input.setAttribute("rows", "5");
       input.addEventListener("input", updateClearState);
     }
@@ -418,11 +418,11 @@
   function setupSpecialProjectActions() {
     const footer = document.querySelector(".app-footer");
     if (!footer || document.getElementById("createProjectButton")) return;
-    const create = document.createElement("button"); create.id = "createProjectButton"; create.type = "button"; create.textContent = "＋ Criar Projeto";
-    const analyze = document.createElement("button"); analyze.id = "analyzeProjectButton"; analyze.type = "button"; analyze.textContent = "⌁ Analisar Projeto";
+    const create = document.createElement("button"); create.id = "createProjectButton"; create.type = "button"; create.textContent = "＋ Create Project";
+    const analyze = document.createElement("button"); analyze.id = "analyzeProjectButton"; analyze.type = "button"; analyze.textContent = "⌁ Analyze Project";
     footer.insertBefore(create, document.getElementById("settingsButton")); footer.insertBefore(analyze, document.getElementById("settingsButton"));
     const modal = document.createElement("section"); modal.className = "lb-special-modal"; modal.id = "specialProjectModal"; modal.hidden = true; modal.setAttribute("role", "dialog"); modal.setAttribute("aria-modal", "true");
-    modal.innerHTML = '<div class="lb-special-modal-card"><button class="lb-special-close" type="button" aria-label="Fechar">×</button><span class="mock-label">// NOVO PROJETO</span><h2>Crie a base do seu projeto</h2><p>Descreva em poucas palavras o que você quer criar. A LovaRPM vai preparar uma solicitação mínima para iniciar o projeto.</p><textarea rows="4" maxlength="500" placeholder="Um sistema de pedidos para restaurante"></textarea><div class="lb-special-actions"><button class="button-secondary" type="button">Cancelar</button><button class="button-primary" type="button">Gerar projeto</button></div><p class="lb-special-feedback" aria-live="polite"></p></div>';
+    modal.innerHTML = '<div class="lb-special-modal-card"><button class="lb-special-close" type="button" aria-label="Close">×</button><span class="mock-label">// NEW PROJECT</span><h2>Set up your project</h2><p>Briefly describe what you want to create. LovaRPM will prepare a minimal request to start the project.</p><textarea rows="4" maxlength="500" placeholder="A restaurant ordering system"></textarea><div class="lb-special-actions"><button class="button-secondary" type="button">Cancel</button><button class="button-primary" type="button">Generate project</button></div><p class="lb-special-feedback" aria-live="polite"></p></div>';
     document.body.appendChild(modal);
     const input = modal.querySelector("textarea"), submit = modal.querySelector(".button-primary"), feedback = modal.querySelector(".lb-special-feedback");
     let mode = "create-project";
@@ -437,31 +437,31 @@
     };
     const close = () => { modal.hidden = true; if (input) input.value = ""; if (feedback) feedback.textContent = ""; };
     modal.querySelector(".lb-special-close")?.addEventListener("click", close); modal.querySelector(".button-secondary")?.addEventListener("click", close);
-    create.addEventListener("click", () => { mode = "create-project"; modal.querySelector(".mock-label").textContent = "// NOVO PROJETO"; modal.querySelector("h2").textContent = "Crie a base do seu projeto"; modal.querySelector("p").textContent = "Descreva em poucas palavras o que você quer criar. A LovaRPM vai preparar uma solicitação mínima para iniciar o projeto."; input.hidden = false; input.placeholder = "Um sistema de pedidos para restaurante"; submit.textContent = "Gerar projeto"; modal.hidden = false; input.focus(); });
+    create.addEventListener("click", () => { mode = "create-project"; modal.querySelector(".mock-label").textContent = "// NEW PROJECT"; modal.querySelector("h2").textContent = "Set up your project"; modal.querySelector("p").textContent = "Briefly describe what you want to create. LovaRPM will prepare a minimal request to start the project."; input.hidden = false; input.placeholder = "A restaurant ordering system"; submit.textContent = "Generate project"; modal.hidden = false; input.focus(); });
     input.addEventListener("focus", () => { if (mode === "create-project") void openLovableDashboard(); });
-    analyze.addEventListener("click", async () => { mode = "analyze-project"; modal.querySelector(".mock-label").textContent = "// ANALISAR PROJETO"; modal.querySelector("h2").textContent = "Analisar projeto em novo chat"; modal.querySelector("p").textContent = "A LovaRPM abrirá uma nova conversa do ChatGPT e carregará o contexto técnico do repositório. Nenhum arquivo será alterado durante a análise."; input.hidden = true; input.value = ""; submit.textContent = "Analisar projeto"; modal.hidden = false; submit.focus(); });
+    analyze.addEventListener("click", async () => { mode = "analyze-project"; modal.querySelector(".mock-label").textContent = "// ANALYZE PROJECT"; modal.querySelector("h2").textContent = "Analyze project in a new chat"; modal.querySelector("p").textContent = "LovaRPM will open a new ChatGPT conversation and load the repository's technical context. No files will be changed during the analysis."; input.hidden = true; input.value = ""; submit.textContent = "Analyze project"; modal.hidden = false; submit.focus(); });
     submit.addEventListener("click", async () => {
-      submit.disabled = true; if (feedback) feedback.textContent = "Preparando operação…";
+      submit.disabled = true; if (feedback) feedback.textContent = "Preparing operation…";
       try {
         const currentWorkspace = typeof workspace !== "undefined" ? workspace : {};
-        const payload = { lovableProjectId: currentWorkspace.lovableProjectId || "AUTO_NOT_DETECTED", platform: currentWorkspace.platform || "lovable", repository: currentWorkspace.repository || "AUTO_NOT_DETECTED", title: currentWorkspace.sourceTitle || (mode === "create-project" ? "Novo projeto" : ""), sourceUrl: currentWorkspace.sourceUrl || "" };
+        const payload = { lovableProjectId: currentWorkspace.lovableProjectId || "AUTO_NOT_DETECTED", platform: currentWorkspace.platform || "lovable", repository: currentWorkspace.repository || "AUTO_NOT_DETECTED", title: currentWorkspace.sourceTitle || (mode === "create-project" ? "New project" : ""), sourceUrl: currentWorkspace.sourceUrl || "" };
         if (mode === "create-project") payload.text = String(input.value || "").trim();
-        if (mode === "create-project" && !payload.text) throw new Error("Descreva o projeto antes de continuar.");
-        if (mode === "analyze-project" && !/^[^/\s]+\/[^/\s]+$/.test(payload.repository)) throw new Error("Conecte o GitHub deste projeto antes de iniciar a análise profunda.");
-        if (feedback) feedback.textContent = "Preparando prompt no servidor…";
+        if (mode === "create-project" && !payload.text) throw new Error("Describe the project before continuing.");
+        if (mode === "analyze-project" && !/^[^/\s]+\/[^/\s]+$/.test(payload.repository)) throw new Error("Connect this project's GitHub repository before starting the in-depth analysis.");
+        if (feedback) feedback.textContent = "Preparing the prompt on the server…";
         const prepared = await chrome.runtime.sendMessage({ type: "LOVABURST_PREPARE_SPECIAL_OPERATION", operation: mode, payload });
-        if (!prepared?.ok || !prepared.prompt) throw new Error(prepared?.error || "O servidor não preparou esta operação.");
+        if (!prepared?.ok || !prepared.prompt) throw new Error(prepared?.error || "The server did not prepare this operation.");
         if (mode === "analyze-project") {
-          if (feedback) feedback.textContent = "Abrindo um novo chat e enviando a análise…";
+          if (feedback) feedback.textContent = "Opening a new chat and sending the analysis…";
           await newConversation({ initialPrompt: prepared.prompt });
-          if (feedback) feedback.textContent = "Análise enviada ao novo chat do ChatGPT.";
+          if (feedback) feedback.textContent = "Analysis sent to the new ChatGPT chat.";
           setTimeout(close, 900);
           return;
         }
         const platformName = payload.platform === "base44" ? "Base44" : "Lovable";
         const tabs = await chrome.tabs.query({ url: [payload.platform === "base44" ? "https://app.base44.com/*" : "https://lovable.dev/*"] });
         const tab = tabs.find((item) => payload.lovableProjectId !== "AUTO_NOT_DETECTED" && item.url?.includes(payload.lovableProjectId)) || tabs.find((item) => item.active) || null;
-        if (!tab?.id) throw new Error(`Abra o dashboard do ${platformName} antes de enviar o prompt.`);
+        if (!tab?.id) throw new Error(`Open the ${platformName} dashboard before sending the prompt.`);
         await chrome.tabs.update(tab.id, { active: true });
         await waitForTabComplete(tab.id);
         const injected = await chrome.scripting.executeScript({ target: { tabId: tab.id }, args: [prepared.prompt], func: (prompt) => {
@@ -470,7 +470,7 @@
             const rect = element.getBoundingClientRect(); const style = getComputedStyle(element);
             return rect.width > 220 && rect.height > 28 && style.display !== "none" && style.visibility !== "hidden";
           });
-          if (!input) return { ok: false, error: "Não encontrei o campo de prompt da plataforma." };
+          if (!input) return { ok: false, error: "Could not find the platform's prompt field." };
           input.focus();
           if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement) {
             const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set || Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
@@ -480,9 +480,9 @@
           input.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
           return { ok: true };
         }});
-        if (!injected?.[0]?.result?.ok) throw new Error(injected?.[0]?.result?.error || `Não foi possível preencher o prompt no ${platformName}.`);
+        if (!injected?.[0]?.result?.ok) throw new Error(injected?.[0]?.result?.error || `Could not fill in the prompt on ${platformName}.`);
         await chrome.tabs.create({ url: "https://chatgpt.com/", active: false });
-        if (feedback) feedback.textContent = `Prompt preparado no ${platformName}. Revise e envie por lá; uma nova conversa do ChatGPT foi aberta para conectar depois.`;
+        if (feedback) feedback.textContent = `Prompt prepared in ${platformName}. Review and send it there; a new ChatGPT conversation has been opened for you to connect later.`;
         setTimeout(close, 900);
       } catch (error) { if (feedback) feedback.textContent = error instanceof Error ? error.message : String(error); }
       finally { submit.disabled = false; }

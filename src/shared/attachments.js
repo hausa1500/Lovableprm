@@ -5,17 +5,17 @@
   // LovaRPM only applies transport-safety limits for MV3 message serialization.
   const isImage = file => /^image\/(png|jpeg|webp)$/i.test(file?.type || "");
   function validate(file, current=[]) {
-    if (!(file instanceof File) && !(file instanceof Blob)) return "Arquivo inválido.";
-    const name = String(file.name || "anexo");
-    if (current.length >= MAX_FILES) return `Limite de ${MAX_FILES} anexos por envio.`;
-    if (!file.size) return `${name} está vazio.`;
-    if (file.size > MAX_FILE_BYTES) return `${name} excede o limite técnico de 20 MB por arquivo da LovaRPM.`;
+    if (!(file instanceof File) && !(file instanceof Blob)) return "Invalid file.";
+    const name = String(file.name || "attachment");
+    if (current.length >= MAX_FILES) return `Limit: ${MAX_FILES} attachments per submission.`;
+    if (!file.size) return `${name} is empty.`;
+    if (file.size > MAX_FILE_BYTES) return `${name} exceeds LovaRPM's 20 MB technical limit per file.`;
     const total = current.reduce((n,item)=>n+(item.file?.size||item.size||0),0) + file.size;
-    if (total > MAX_TOTAL_BYTES) return "Os anexos excedem o limite técnico total de 40 MB da LovaRPM.";
+    if (total > MAX_TOTAL_BYTES) return "Attachments exceed LovaRPM's 40 MB total technical limit.";
     return "";
   }
   function make(file) {
-    return { id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`, file, url: isImage(file) ? URL.createObjectURL(file) : "", name: file.name || `imagem-${Date.now()}.png`, type: file.type || "", size: file.size };
+    return { id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`, file, url: isImage(file) ? URL.createObjectURL(file) : "", name: file.name || `image-${Date.now()}.png`, type: file.type || "", size: file.size };
   }
   function release(item){ if(item?.url) URL.revokeObjectURL(item.url); }
   async function serialize(items) {

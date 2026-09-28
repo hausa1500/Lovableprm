@@ -4,11 +4,15 @@ function activeBuilderName() { return workspace.platform === "base44" ? "Base44"
 function activeBuilderPattern() { return workspace.platform === "base44" ? "https://app.base44.com/apps/*" : "https://lovable.dev/*"; }
 function activeBuilderPrefix() { return workspace.platform === "base44" ? "https://app.base44.com/apps/" : "https://lovable.dev/"; }
 
+function displayConversationTitle(conversation, title) {
+  return !conversation?.lockedUrl && title === "Nova conversa · ChatGPT" ? "New conversation · ChatGPT" : title;
+}
+
 function formatStatusTime(value) {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 }
 
 async function refreshRunStatus() {
@@ -16,8 +20,8 @@ async function refreshRunStatus() {
   if (!projectId) {
     ui.runStatusMain.dataset.status = "idle";
     ui.runStatusIcon.textContent = "◌";
-    ui.runStatusTitle.textContent = "Nenhum projeto selecionado";
-    ui.runStatusText.textContent = `Abra um projeto do ${activeBuilderName()} para acompanhar as solicitações.`;
+    ui.runStatusTitle.textContent = "No project selected";
+    ui.runStatusText.textContent = `Open a ${activeBuilderName()} project to track requests.`;
     ui.runStatusTime.textContent = "";
     ui.runStatusLoader.hidden = true;
     ui.runObjective.hidden = true;
@@ -31,8 +35,8 @@ async function refreshRunStatus() {
   if (!status) {
     ui.runStatusMain.dataset.status = "idle";
     ui.runStatusIcon.textContent = "◌";
-    ui.runStatusTitle.textContent = "Nenhuma solicitação enviada ainda";
-    ui.runStatusText.textContent = "Quando você enviar um comando, o andamento aparecerá aqui.";
+    ui.runStatusTitle.textContent = "No requests sent yet";
+    ui.runStatusText.textContent = "Progress will appear here after you send a request.";
     ui.runStatusTime.textContent = "";
     ui.runStatusLoader.hidden = true;
     ui.runObjective.hidden = true;
@@ -41,14 +45,14 @@ async function refreshRunStatus() {
   }
 
   const states = {
-    sending: { icon: "↗", title: "Enviando para o ChatGPT…", text: "Preparando o projeto, repositório e contexto da solicitação.", loading: true },
-    working: { icon: "✦", title: "ChatGPT trabalhando…", text: "Acompanhe abaixo a resposta visível conforme ela aparece no ChatGPT.", loading: true },
-    done: { icon: "✓", title: "Concluído", text: "O ChatGPT terminou esta solicitação com sucesso.", loading: false },
-    blocked: { icon: "!", title: "Ação necessária", text: "O ChatGPT encontrou um bloqueio e precisa da sua atenção.", loading: false },
-    error: { icon: "×", title: "Erro na execução", text: status.error || "Não foi possível concluir esta solicitação.", loading: false },
+    sending: { icon: "↗", title: "Sending to ChatGPT…", text: "Preparing the project, repository, and request context.", loading: true },
+    working: { icon: "✦", title: "ChatGPT is working…", text: "Track the live response below as it appears in ChatGPT.", loading: true },
+    done: { icon: "✓", title: "Complete", text: "ChatGPT completed this request successfully.", loading: false },
+    blocked: { icon: "!", title: "Action required", text: "ChatGPT encountered a blocker and needs your attention.", loading: false },
+    error: { icon: "×", title: "Execution error", text: status.error || "This request could not be completed.", loading: false },
   };
 
-  const state = states[status.status] || { icon: "◌", title: "Aguardando", text: "A solicitação está sendo preparada.", loading: false };
+  const state = states[status.status] || { icon: "◌", title: "Waiting", text: "The request is being prepared.", loading: false };
   ui.runStatusMain.dataset.status = status.status || "idle";
   ui.runStatusIcon.textContent = state.icon;
   ui.runStatusTitle.textContent = state.title;
@@ -61,7 +65,7 @@ async function refreshRunStatus() {
     const showMirror = Boolean(liveResponse) && (status.status === "working" || terminal);
     ui.runResponseMirror.hidden = !showMirror;
     ui.runResponseMirror.dataset.state = terminal ? "done" : "live";
-    ui.runResponseState.textContent = terminal ? "Resposta concluída" : "Atualizando em tempo real";
+    ui.runResponseState.textContent = terminal ? "Response complete" : "Updating in real time";
     if (showMirror && ui.runResponseBody.textContent !== liveResponse) {
       ui.runResponseBody.textContent = liveResponse;
       ui.runResponseBody.scrollTop = ui.runResponseBody.scrollHeight;
@@ -88,11 +92,11 @@ async function refreshChat() {
     ui.connectedCard.hidden = !hasProject || !connected;
     if (!hasProject) return;
     if (connected) {
-      ui.chatState.textContent = available ? "Conversa travada" : "Conversa travada · abra a conversa correta";
-      ui.memoryState.textContent = conversation.lockedTitle || conversation.title || "Conversa exclusiva deste projeto";
+      ui.chatState.textContent = available ? "Conversation locked" : "Conversation locked · open the correct conversation";
+      ui.memoryState.textContent = displayConversationTitle(conversation, conversation.lockedTitle || conversation.title || "Conversation exclusive to this project");
     } else {
       const tabs = await chatTabs();
-      ui.help.textContent = tabs.length ? "Encontramos uma conversa aberta. Você pode usá-la ou criar uma nova." : "Abra o ChatGPT em uma aba ou crie uma nova conversa por aqui.";
+      ui.help.textContent = tabs.length ? "An open conversation was found. You can use it or create a new one." : "Open ChatGPT in a tab or create a new conversation here.";
     }
   } finally { refreshingChat = false; }
 }
@@ -130,12 +134,12 @@ async function reloadLovableAndExtensionUi() {
   if (!ui.refreshRepo || ui.refreshRepo.disabled) return;
   ui.refreshRepo.disabled = true;
   ui.refreshRepo.dataset.loading = "true";
-  ui.refreshRepo.title = `Recarregando ${activeBuilderName()} e LovaRPM…`;
+  ui.refreshRepo.title = `Reloading ${activeBuilderName()} and LovaRPM…`;
 
   try {
     const tabs = await chrome.tabs.query({ url: [activeBuilderPattern()] });
     const tab = tabs.find((item) => workspace.lovableProjectId && item.url?.includes(workspace.lovableProjectId)) || tabs.find((item) => item.active) || tabs[0];
-    if (!tab?.id) throw new Error(`Não encontrei uma aba do ${activeBuilderName()} para recarregar.`);
+    if (!tab?.id) throw new Error(`Could not find a ${activeBuilderName()} tab to reload.`);
 
     await chrome.tabs.reload(tab.id);
     await waitForTabComplete(tab.id);
@@ -143,23 +147,23 @@ async function reloadLovableAndExtensionUi() {
   } catch (error) {
     ui.refreshRepo.disabled = false;
     delete ui.refreshRepo.dataset.loading;
-    ui.refreshRepo.title = "Atualizar workspace e integrações";
-    showFeedback(error?.message || `Não foi possível recarregar o ${activeBuilderName()} e a LovaRPM.`);
+    ui.refreshRepo.title = "Refresh workspace and integrations";
+    showFeedback(error?.message || `Could not reload ${activeBuilderName()} and LovaRPM.`);
   }
 }
 
 function showFeedback(message, tone = "") {
   const text = String(message || "");
   if (!tone) {
-    if (/erro|falha|não foi possível|não encontrei|inválid|indisponível|permissão|conecte este projeto/i.test(text)) tone = "error";
-    else if (/enviado|iniciad|aprimorado|atualizados|removida|sucesso|concluíd/i.test(text)) tone = "success";
+    if (/error|failed|could not|couldn't|invalid|unavailable|permission|connect this project|erro|falha|não foi possível|não encontrei|inválid|indisponível|permissão|conecte este projeto/i.test(text)) tone = "error";
+    else if (/sent|started|enhanced|updated|removed|success|complete|enviado|iniciad|aprimorado|atualizados|removida|sucesso|concluíd/i.test(text)) tone = "success";
     else tone = "info";
   }
   ui.feedback.hidden = false; ui.feedback.textContent = text; ui.feedback.dataset.tone = tone;
 }
 async function chooseChatTab() {
   const tabs = await chatTabs();
-  if (!tabs.length) throw new Error("Nenhuma conversa do ChatGPT está aberta. Abra uma aba do ChatGPT ou crie uma nova conversa.");
+  if (!tabs.length) throw new Error("No ChatGPT conversations are open. Open a ChatGPT tab or create a new conversation.");
 
   const projectId = workspace.lovableProjectId;
   const all = await bindings();
@@ -176,7 +180,7 @@ async function chooseChatTab() {
     overlay.className = "lb-chat-picker";
     overlay.setAttribute("role", "dialog");
     overlay.setAttribute("aria-modal", "true");
-    overlay.innerHTML = '<section class="lb-chat-picker-panel"><header><div><span>// CHATGPT</span><strong>Trocar conversa</strong><p>Escolha qual conversa ficará exclusiva deste projeto.</p></div><button type="button" data-close aria-label="Fechar">×</button></header><div class="lb-chat-picker-list"></div><button type="button" class="lb-chat-picker-cancel" data-close>Cancelar</button></section>';
+    overlay.innerHTML = '<section class="lb-chat-picker-panel"><header><div><span>// CHATGPT</span><strong>Switch conversation</strong><p>Choose the conversation to reserve for this project.</p></div><button type="button" data-close aria-label="Close">×</button></header><div class="lb-chat-picker-list"></div><button type="button" class="lb-chat-picker-cancel" data-close>Cancel</button></section>';
 
     const list = overlay.querySelector(".lb-chat-picker-list");
     for (const tab of tabs) {
@@ -190,9 +194,9 @@ async function chooseChatTab() {
       const title = document.createElement("strong");
       title.textContent = tab.title || "ChatGPT";
       const url = document.createElement("span");
-      url.textContent = tab.url === "https://chatgpt.com/" ? "Nova conversa ainda sem URL própria" : tab.url;
+      url.textContent = tab.url === "https://chatgpt.com/" ? "New conversation without its own URL yet" : tab.url;
       const state = document.createElement("small");
-      state.textContent = unavailable ? "Exclusiva de outro projeto" : (tab.active ? "Aba ativa" : "Disponível");
+      state.textContent = unavailable ? "Reserved for another project" : (tab.active ? "Active tab" : "Available");
       button.append(title, url, state);
       if (!unavailable) button.addEventListener("click", () => { overlay.remove(); resolve(tab); });
       list.append(button);
@@ -212,7 +216,7 @@ async function chooseChatTab() {
 }
 
 async function useOpenConversation() {
-  if (!workspace.lovableProjectId) throw new Error(`Abra um projeto do ${activeBuilderName()} primeiro.`);
+  if (!workspace.lovableProjectId) throw new Error(`Open a ${activeBuilderName()} project first.`);
   const selected = await chooseChatTab();
   if (!selected?.tabId) return false;
   await linkTab(selected.tabId);
@@ -230,41 +234,41 @@ async function openActiveConversation() {
 
 function renderSendButton(sending = false) {
   ui.sendCommand.innerHTML = sending
-    ? '<span class="send-mark" aria-hidden="true">◌</span><b>Enviando…</b><span class="send-arrow" aria-hidden="true">→</span>'
-    : '<span class="send-mark" aria-hidden="true">✦</span><b>Enviar</b><span class="send-arrow" aria-hidden="true">➜</span>';
+    ? '<span class="send-mark" aria-hidden="true">◌</span><b>Sending…</b><span class="send-arrow" aria-hidden="true">→</span>'
+    : '<span class="send-mark" aria-hidden="true">✦</span><b>Send</b><span class="send-arrow" aria-hidden="true">➜</span>';
 }
 
 async function sendCommand() {
   if (globalThis.__LOVABURST_POPUP_ATTACHMENTS__?.hasFiles?.()) return;
   const objective = ui.commandInput.value.trim();
-  if (!objective) { ui.commandInput.focus(); showFeedback("Digite o que você quer alterar."); return; }
-  if (!workspace.lovableProjectId) { showFeedback(`Abra o projeto do ${activeBuilderName()} que você quer alterar.`); return; }
+  if (!objective) { ui.commandInput.focus(); showFeedback("Enter what you want to change."); return; }
+  if (!workspace.lovableProjectId) { showFeedback(`Open the ${activeBuilderName()} project you want to change.`); return; }
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(String(workspace.repository || "").trim())) {
-    showFeedback("Conecte este projeto ao GitHub para enviar solicitações pela LovaRPM.", "error");
+    showFeedback("Connect this project to GitHub to send requests through LovaRPM.", "error");
     return;
   }
   let rec = await record(workspace.lovableProjectId);
-  if (!active(rec)) { showFeedback("Conecte uma conversa do ChatGPT antes de enviar."); ui.setupCard.hidden = false; return; }
+  if (!active(rec)) { showFeedback("Connect a ChatGPT conversation before sending."); ui.setupCard.hidden = false; return; }
   ui.sendCommand.disabled = true;
   renderSendButton(true);
   try {
     const tabs = await chrome.tabs.query({ url: [activeBuilderPattern()] });
     const source = tabs.find((tab) => tab.url?.includes(workspace.lovableProjectId)) || tabs[0];
-    if (!source?.id) throw new Error(`Não encontrei a aba deste projeto no ${activeBuilderName()}.`);
+    if (!source?.id) throw new Error(`Could not find this project's ${activeBuilderName()} tab.`);
     const skills = await selectedSkills();
     const response = await chrome.tabs.sendMessage(source.id, { type: "LOVABURST_SUBMIT_OBJECTIVE", objective, skills });
-    if (!response?.ok) throw new Error(response?.error || "Não foi possível enviar.");
+    if (!response?.ok) throw new Error(response?.error || "Could not send the request.");
     await update(workspace.lovableProjectId, (current) => {
       const previous = current.recentObjectives?.[current.recentObjectives.length - 1];
       const repeated = previous && String(previous.text || "") === objective && Date.now() - new Date(previous.createdAt || 0).getTime() < 30000;
       return repeated ? current : { ...current, recentObjectives: [...(current.recentObjectives || []), { text: objective, createdAt: now() }].slice(-50) };
     });
-    ui.commandInput.value = ""; updateCounter(); ui.commandInput.dispatchEvent(new Event("input", { bubbles: true })); showFeedback("Enviado ao ChatGPT."); await refreshRunStatus();
+    ui.commandInput.value = ""; updateCounter(); ui.commandInput.dispatchEvent(new Event("input", { bubbles: true })); showFeedback("Sent to ChatGPT."); await refreshRunStatus();
   } catch (error) {
     const message = error?.message || String(error);
-    showFeedback(/github|repositório|repository|sem github|não conectado/i.test(message)
-      ? "Conecte este projeto ao GitHub para enviar solicitações pela LovaRPM."
-      : message, /github|repositório|repository|sem github|não conectado/i.test(message) ? "error" : "");
+    showFeedback(/github|repository|repositório|no github|sem github|not connected|não conectado/i.test(message)
+      ? "Connect this project to GitHub to send requests through LovaRPM."
+      : message, /github|repository|repositório|no github|sem github|not connected|não conectado/i.test(message) ? "error" : "");
   }
   finally { ui.sendCommand.disabled = false; renderSendButton(false); await refreshChat(); }
 }
@@ -274,12 +278,12 @@ function updateCounter() { ui.commandCounter.textContent = ""; }
 async function checkForBrowserManagedUpdate({ announce = false } = {}) {
   const version = chrome.runtime.getManifest().version; ui.version.classList.add("checking");
   try {
-    if (typeof chrome.runtime.requestUpdateCheck !== "function") { if (announce) showFeedback(`Você está na LovaRPM v${version}. Atualizações automáticas ficarão disponíveis quando a extensão estiver no canal oficial.`); return; }
+    if (typeof chrome.runtime.requestUpdateCheck !== "function") { if (announce) showFeedback(`You are using LovaRPM v${version}. Automatic updates will be available when the extension is on the official channel.`); return; }
     const result = await chrome.runtime.requestUpdateCheck(); const status = typeof result === "string" ? result : result?.status; const versionAvailable = typeof result === "object" ? result?.version : "";
-    if (status === "update_available") { ui.version.classList.add("update"); ui.updateBanner.hidden = false; ui.updateTitle.textContent = versionAvailable ? `LovaRPM v${versionAvailable} disponível` : "Nova versão disponível"; ui.updateText.textContent = "O Chrome encontrou uma atualização oficial. Ela será aplicada pelo próprio navegador."; return; }
+    if (status === "update_available") { ui.version.classList.add("update"); ui.updateBanner.hidden = false; ui.updateTitle.textContent = versionAvailable ? `LovaRPM v${versionAvailable} available` : "New version available"; ui.updateText.textContent = "Chrome found an official update. The browser will install it."; return; }
     ui.version.classList.remove("update"); ui.updateBanner.hidden = true;
-    if (announce) showFeedback(status === "throttled" ? `LovaRPM v${version}. O Chrome limitou uma nova verificação agora.` : `LovaRPM v${version}. Nenhuma atualização gerenciada pelo Chrome foi encontrada.`);
-  } catch { if (announce) showFeedback(`LovaRPM v${version}. Nesta instalação beta por pasta/ZIP, a atualização continua sendo manual.`); }
+    if (announce) showFeedback(status === "throttled" ? `LovaRPM v${version}. Chrome has temporarily limited another check.` : `LovaRPM v${version}. No Chrome-managed update was found.`);
+  } catch { if (announce) showFeedback(`LovaRPM v${version}. Updates are manual for this beta folder/ZIP installation.`); }
   finally { ui.version.classList.remove("checking"); }
 }
 
@@ -291,7 +295,7 @@ async function findCurrentLovableTab() {
     || null;
 }
 
-const HIDE_LOVABLE_BADGE_OBJECTIVE = `Adicione a seguinte regra ao arquivo src/index.css para ocultar o badge do Lovable em toda a aplicação:
+const HIDE_LOVABLE_BADGE_OBJECTIVE = `Add the following rule to src/index.css to hide the Lovable badge throughout the application:
 
 /* Hide Lovable badge */
 #lovable-badge {
@@ -299,28 +303,28 @@ const HIDE_LOVABLE_BADGE_OBJECTIVE = `Adicione a seguinte regra ao arquivo src/i
 }`;
 
 async function hideLovableBadge() {
-  if (workspace.platform === "base44") throw new Error("A remoção da marca da plataforma continua disponível somente para projetos Lovable.");
-  if (!workspace.lovableProjectId) throw new Error("Abra um projeto do Lovable antes de remover a marca d’água.");
+  if (workspace.platform === "base44") throw new Error("Removing platform branding is available only for Lovable projects.");
+  if (!workspace.lovableProjectId) throw new Error("Open a Lovable project before removing its badge.");
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(String(workspace.repository || "").trim())) {
-    throw new Error("Conecte este projeto ao GitHub antes de remover a marca d’água.");
+    throw new Error("Connect this project to GitHub before removing its badge.");
   }
   const rec = await record(workspace.lovableProjectId);
-  if (!active(rec)) throw new Error("Conecte uma conversa do ChatGPT antes de remover a marca d’água.");
+  if (!active(rec)) throw new Error("Connect a ChatGPT conversation before removing the badge.");
   const tab = await findCurrentLovableTab();
-  if (!tab?.id) throw new Error("Abra um projeto do Lovable antes de remover a marca d’água.");
+  if (!tab?.id) throw new Error("Open a Lovable project before removing its badge.");
   const response = await chrome.tabs.sendMessage(tab.id, {
     type: "LOVABURST_SUBMIT_OBJECTIVE",
     objective: HIDE_LOVABLE_BADGE_OBJECTIVE,
     skills: [],
   });
-  if (!response?.ok) throw new Error(response?.error || "Não foi possível enviar a remoção da marca d’água.");
-  showFeedback("Comando para remover a marca d’água enviado ao ChatGPT.");
+  if (!response?.ok) throw new Error(response?.error || "Could not send the badge-removal request.");
+  showFeedback("Badge-removal request sent to ChatGPT.");
 }
 
 async function downloadCurrentProject() {
   const repository = String(workspace.repository || "").trim();
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
-    throw new Error("Abra um projeto conectado ao GitHub antes de baixar.");
+    throw new Error("Open a project connected to GitHub before downloading.");
   }
   const [owner, name] = repository.split("/");
   await chrome.downloads.download({
@@ -329,14 +333,14 @@ async function downloadCurrentProject() {
     saveAs: true,
     conflictAction: "uniquify",
   });
-  showFeedback("Download do projeto iniciado.");
+  showFeedback("Project download started.");
 }
 
 async function renderConfig(config) { ui.enabled.checked = Boolean(config.enabled); ui.sendCommand.disabled = !config.enabled; }
 ui.enabled.addEventListener("change", async () => { const config = await getConfig(); await renderConfig(await setConfig({ ...config, enabled: ui.enabled.checked })); });
 ui.refreshRepo.addEventListener("click", (event) => { event.preventDefault(); event.stopImmediatePropagation(); void reloadLovableAndExtensionUi(); }, true);
-ui.useOpen.addEventListener("click", async () => { ui.useOpen.disabled = true; ui.help.textContent = "Escolha a conversa que será exclusiva deste projeto."; try { const changed = await useOpenConversation(); if (changed) await refreshChat(); } catch (error) { ui.help.textContent = error?.message || String(error); } finally { ui.useOpen.disabled = false; } });
-ui.create.addEventListener("click", async () => { ui.create.disabled = true; ui.help.textContent = "Criando e preparando a conversa…"; try { await newConversation(); await refreshChat(); } catch (error) { ui.help.textContent = error?.message || String(error); } finally { ui.create.disabled = false; } });
+ui.useOpen.addEventListener("click", async () => { ui.useOpen.disabled = true; ui.help.textContent = "Choose the conversation to reserve for this project."; try { const changed = await useOpenConversation(); if (changed) await refreshChat(); } catch (error) { ui.help.textContent = error?.message || String(error); } finally { ui.useOpen.disabled = false; } });
+ui.create.addEventListener("click", async () => { ui.create.disabled = true; ui.help.textContent = "Creating and preparing the conversation…"; try { await newConversation(); await refreshChat(); } catch (error) { ui.help.textContent = error?.message || String(error); } finally { ui.create.disabled = false; } });
 ui.open.addEventListener("click", async () => { try { await openActiveConversation(); } catch (error) { showFeedback(error?.message || String(error)); } });
 ui.compactNew.addEventListener("click", async () => { ui.compactNew.disabled = true; try { await newConversation(); await refreshChat(); } catch (error) { showFeedback(error?.message || String(error)); } finally { ui.compactNew.disabled = false; } });
 ui.useAnother.addEventListener("click", async () => {
@@ -345,7 +349,7 @@ ui.useAnother.addEventListener("click", async () => {
     const changed = await useOpenConversation();
     if (changed) {
       await refreshChat();
-      showFeedback("Conversa selecionada e travada exclusivamente para este projeto.", "success");
+      showFeedback("Conversation selected and locked exclusively to this project.", "success");
     }
   } catch (error) { showFeedback(error?.message || String(error)); }
   finally { ui.useAnother.disabled = false; }
@@ -363,16 +367,16 @@ commandsTabButton.className = "tab";
 commandsTabButton.id = "commandsTabButton";
 commandsTabButton.dataset.tab = "commands";
 commandsTabButton.type = "button";
-commandsTabButton.innerHTML = '<span class="tab-icon">⌘</span> Comandos';
+commandsTabButton.innerHTML = '<span class="tab-icon">⌘</span> Commands';
 ui.skillsTab?.before(commandsTabButton);
 
 const commandsPanel = document.createElement("div");
 commandsPanel.className = "tab-panel";
 commandsPanel.id = "commandsPanel";
-commandsPanel.innerHTML = '<section class="commands-hero"><div class="commands-orb">⌘</div><div><span>// COMANDOS PRONTOS</span><h2>Escolha o que deseja fazer.</h2><p>Ao clicar, o comando completo será colocado no campo de prompt para você revisar e enviar.</p></div></section><section class="commands-grid" id="commandsGrid"><button class="command-preset-card" data-command-file="corrigir" data-command-title="CORRIGIR" type="button"><span>FIX</span><div><strong>CORRIGIR</strong><small>Auditoria completa e correção de bugs.</small></div><b>→</b></button><button class="command-preset-card" data-command-file="melhorar" data-command-title="MELHORAR" type="button"><span>UX</span><div><strong>MELHORAR</strong><small>Melhoria profunda da interface e experiência.</small></div><b>→</b></button><button class="command-preset-card" data-command-file="otimizar" data-command-title="OTIMIZAR" type="button"><span>OPT</span><div><strong>OTIMIZAR</strong><small>Otimização completa do projeto.</small></div><b>→</b></button><button class="command-preset-card" data-command-file="refatorar" data-command-title="REFATORAR" type="button"><span>REF</span><div><strong>REFATORAR</strong><small>Revisão e refatoração ampla do código.</small></div><b>→</b></button><button class="command-preset-card" data-command-file="responsivo" data-command-title="RESPONSIVO" type="button"><span>RWD</span><div><strong>RESPONSIVO</strong><small>Adaptação completa para todos os dispositivos.</small></div><b>→</b></button><button class="command-preset-card" data-command-file="seguranca" data-command-title="SEGURANÇA" type="button"><span>SEC</span><div><strong>SEGURANÇA</strong><small>Auditoria de segurança e banco de dados.</small></div><b>→</b></button></section><div class="commands-feedback" id="commandsFeedback" role="status" aria-live="polite">Selecione um comando para prepará-lo no prompt.</div>';
+commandsPanel.innerHTML = '<section class="commands-hero"><div class="commands-orb">⌘</div><div><span>// READY-MADE COMMANDS</span><h2>Choose what you would like to do.</h2><p>Selecting a command fills the prompt field with its full text so you can review and send it.</p></div></section><section class="commands-grid" id="commandsGrid"><button class="command-preset-card" data-command-file="corrigir" data-command-title="FIX" type="button"><span>FIX</span><div><strong>FIX</strong><small>Complete audit and bug fixes.</small></div><b>→</b></button><button class="command-preset-card" data-command-file="melhorar" data-command-title="IMPROVE" type="button"><span>UX</span><div><strong>IMPROVE</strong><small>In-depth improvement of the interface and experience.</small></div><b>→</b></button><button class="command-preset-card" data-command-file="otimizar" data-command-title="OPTIMIZE" type="button"><span>OPT</span><div><strong>OPTIMIZE</strong><small>Complete project optimization.</small></div><b>→</b></button><button class="command-preset-card" data-command-file="refatorar" data-command-title="REFACTOR" type="button"><span>REF</span><div><strong>REFACTOR</strong><small>Broad code review and refactoring.</small></div><b>→</b></button><button class="command-preset-card" data-command-file="responsivo" data-command-title="RESPONSIVE" type="button"><span>RWD</span><div><strong>RESPONSIVE</strong><small>Complete adaptation for all devices.</small></div><b>→</b></button><button class="command-preset-card" data-command-file="seguranca" data-command-title="SECURITY" type="button"><span>SEC</span><div><strong>SECURITY</strong><small>Security and database audit.</small></div><b>→</b></button></section><div class="commands-feedback" id="commandsFeedback" role="status" aria-live="polite">Select a command to prepare it in the prompt.</div>';
 const extraCommands = [
-  ["futurista-uma-cor", "FUTURISTA UMA COR", "3D", "FUTURISTA — UMA COR", "Sidebar futurista e 3D com uma identidade cromática predominante."],
-  ["botoes-coloridos", "BOTÕES COLORIDOS", "RGB", "BOTÕES COM CORES DIFERENTES", "Sidebar futurista com uma cor vibrante e distinta em cada botão."],
+  ["futurista-uma-cor", "FUTURISTIC ONE COLOR", "3D", "FUTURISTIC — ONE COLOR", "Futuristic 3D sidebar with a predominantly single-color identity."],
+  ["botoes-coloridos", "COLORFUL BUTTONS", "RGB", "BUTTONS IN DIFFERENT COLORS", "Futuristic sidebar with a distinct vibrant color for each button."],
 ];
 const commandsGrid = commandsPanel.querySelector("#commandsGrid");
 for (const [file, title, icon, name, description] of extraCommands) {
@@ -392,24 +396,24 @@ document.querySelectorAll("[data-command-file]").forEach((card) => {
     const feedback = document.getElementById("commandsFeedback");
     const cards = [...document.querySelectorAll("[data-command-file]")];
     cards.forEach((item) => { item.disabled = true; });
-    feedback.textContent = "Carregando comando…";
+    feedback.textContent = "Loading command…";
     try {
       const response = await chrome.runtime.sendMessage({
         type: "LOVARPM_COMMAND_GET",
         commandId: card.dataset.commandFile,
       });
-      if (!response?.ok) throw new Error(response?.error || "Comando não autorizado.");
+      if (!response?.ok) throw new Error(response?.error || "Command not authorized.");
       const prompt = String(response.command?.prompt || "").trim();
-      if (!prompt) throw new Error("O comando selecionado está vazio.");
+      if (!prompt) throw new Error("The selected command is empty.");
       ui.commandInput.value = prompt;
       ui.commandInput.dispatchEvent(new Event("input", { bubbles: true }));
       setTab("chat");
       ui.commandInput.focus();
       ui.commandInput.setSelectionRange(0, 0);
       ui.commandInput.scrollTop = 0;
-      showFeedback(`Comando ${card.dataset.commandTitle} pronto para revisar e enviar.`, "success");
+      showFeedback(`${card.dataset.commandTitle} command is ready to review and send.`, "success");
     } catch (error) {
-      feedback.textContent = error?.message || "Não foi possível carregar o comando.";
+      feedback.textContent = error?.message || "Could not load the command.";
     } finally {
       cards.forEach((item) => { item.disabled = false; });
     }
@@ -417,42 +421,42 @@ document.querySelectorAll("[data-command-file]").forEach((card) => {
 });
 document.getElementById("chatConnectedCard")?.querySelector(".connected-main")?.addEventListener("click", () => { const card = document.getElementById("chatConnectedCard"); if (card) card.dataset.actionsOpen = card.dataset.actionsOpen === "true" ? "false" : "true"; });
 const additionalSkills = [
-  ["accessibility-wcag", "A11Y", "Accessibility (WCAG)", "WCAG 2.1 AA, semântica, teclado, contraste e ARIA."],
-  ["agent-ui-design", "AGENT", "Agent UI Design", "Interfaces completas para agentes, chat e ferramentas."],
-  ["ai-design-workflow", "AI", "AI Design Workflow", "IA no processo de design com validação humana."],
-  ["audit-code-quality", "CODE", "Audit Code Quality", "Qualidade estrutural, duplicação e manutenção do código."],
-  ["audit-cost-explosion", "COST", "Audit Cost Explosion", "Riscos de custos em APIs, banco, uploads e funções."],
-  ["audit-legal-risks", "LAW", "Audit Legal Risks", "Privacidade, termos, LGPD/GDPR e propriedade intelectual."],
-  ["audit-monitoring-recovery", "OPS", "Audit Monitoring & Recovery", "Observabilidade, erros, uptime, backups e recuperação."],
-  ["audit-secrets-data-leaks", "LEAK", "Audit Secrets & Data Leaks", "Segredos expostos, RLS, Storage e dados sensíveis."],
-  ["audit-unauthorized-access", "AUTH", "Audit Unauthorized Access", "Autenticação, autorização, IDOR e validação de acesso."],
-  ["branding-identity", "BRAND", "Branding & Identity", "Marca, identidade visual e consistência corporativa."],
-  ["cloud-migration", "CLOUD", "Cloud Migration", "Migração completa do Supabase Cloud e seus serviços."],
-  ["color-theory", "COLOR", "Color Theory", "Cores, contraste, tokens, harmonias e dark mode."],
-  ["component-patterns", "COMP", "Component Patterns", "Arquitetura moderna, composição, tokens e variantes."],
-  ["customer-journey", "CX", "Customer Journey", "Jornada, touchpoints, emoções, personas e retenção."],
-  ["design-process", "FLOW", "Design Process", "Processo completo do briefing ao handoff."],
-  ["design-system-pro", "DS", "Design System Pro", "Design system completo e justificado para o projeto."],
-  ["ux-design", "UX", "UX Design", "Estratégia, pesquisa, personas, fluxos e leis essenciais de UX."],
-  ["vibe-security-check", "VSEC", "Vibe Security Check", "Auditoria OWASP, correção de vulnerabilidades e relatório."],
-  ["visual-direction", "ART", "Visual Direction", "Direção visual, paletas, tipografia, layouts e imagens."],
-  ["web-typography", "TYPE", "Web Typography", "Escala, hierarquia, legibilidade e carregamento de fontes."],
-  ["webdesign-review", "REVIEW", "Webdesign Review", "Revisão completa e coordenada das áreas de web design."],
-  ["website-audit-relaunch", "RELAUNCH", "Website Audit & Relaunch", "Auditoria técnica, UX, conteúdo, SEO e conversão."],
-  ["design-trends-2026", "2026", "Design Trends 2026", "Motion, tipografia expressiva, dark mode e storytelling."],
-  ["images-media", "MEDIA", "Images & Media", "Seleção, otimização, acessibilidade e performance de mídia."],
-  ["landing-pages", "LAND", "Landing Pages", "Estrutura, copy, CTA e testes orientados à conversão."],
-  ["navigation-design", "NAV", "Navigation Design", "Menus, breadcrumbs, busca e navegação mobile e desktop."],
-  ["responsive-design", "RWD", "Responsive Design", "Layout mobile-first, grids fluidos e interação por toque."],
-  ["ui-design", "UI", "UI Design", "Grid, espaçamento, hierarquia, tokens e consistência visual."],
-  ["ui-patterns", "PAT", "UI Patterns", "Padrões prontos para heróis, cards, formulários, preços e CTAs."],
-  ["usability", "USE", "Usability", "Heurísticas de Nielsen, ISO 9241 e redução de fricção."],
+  ["accessibility-wcag", "A11Y", "Accessibility (WCAG)", "WCAG 2.1 AA, semantics, keyboard access, contrast, and ARIA."],
+  ["agent-ui-design", "AGENT", "Agent UI Design", "Complete interfaces for agents, chat, and tools."],
+  ["ai-design-workflow", "AI", "AI Design Workflow", "AI in the design process with human validation."],
+  ["audit-code-quality", "CODE", "Audit Code Quality", "Structural quality, duplication, and code maintainability."],
+  ["audit-cost-explosion", "COST", "Audit Cost Explosion", "Cost risks involving APIs, databases, uploads, and functions."],
+  ["audit-legal-risks", "LAW", "Audit Legal Risks", "Privacy, terms, LGPD/GDPR, and intellectual property."],
+  ["audit-monitoring-recovery", "OPS", "Audit Monitoring & Recovery", "Observability, errors, uptime, backups, and recovery."],
+  ["audit-secrets-data-leaks", "LEAK", "Audit Secrets & Data Leaks", "Exposed secrets, RLS, Storage, and sensitive data."],
+  ["audit-unauthorized-access", "AUTH", "Audit Unauthorized Access", "Authentication, authorization, IDOR, and access validation."],
+  ["branding-identity", "BRAND", "Branding & Identity", "Brand, visual identity, and corporate consistency."],
+  ["cloud-migration", "CLOUD", "Cloud Migration", "Full migration of Supabase Cloud and its services."],
+  ["color-theory", "COLOR", "Color Theory", "Color, contrast, tokens, harmony, and dark mode."],
+  ["component-patterns", "COMP", "Component Patterns", "Modern architecture, composition, tokens, and variants."],
+  ["customer-journey", "CX", "Customer Journey", "Journey, touchpoints, emotions, personas, and retention."],
+  ["design-process", "FLOW", "Design Process", "The full process from brief to handoff."],
+  ["design-system-pro", "DS", "Design System Pro", "A complete, justified design system for the project."],
+  ["ux-design", "UX", "UX Design", "Strategy, research, personas, flows, and essential UX principles."],
+  ["vibe-security-check", "VSEC", "Vibe Security Check", "OWASP audit, vulnerability fixes, and reporting."],
+  ["visual-direction", "ART", "Visual Direction", "Visual direction, palettes, typography, layouts, and imagery."],
+  ["web-typography", "TYPE", "Web Typography", "Scale, hierarchy, readability, and font loading."],
+  ["webdesign-review", "REVIEW", "Webdesign Review", "A comprehensive, coordinated review of web design areas."],
+  ["website-audit-relaunch", "RELAUNCH", "Website Audit & Relaunch", "Technical, UX, content, SEO, and conversion audit."],
+  ["design-trends-2026", "2026", "Design Trends 2026", "Motion, expressive typography, dark mode, and storytelling."],
+  ["images-media", "MEDIA", "Images & Media", "Media selection, optimization, accessibility, and performance."],
+  ["landing-pages", "LAND", "Landing Pages", "Structure, copy, CTAs, and conversion-oriented testing."],
+  ["navigation-design", "NAV", "Navigation Design", "Menus, breadcrumbs, search, and mobile and desktop navigation."],
+  ["responsive-design", "RWD", "Responsive Design", "Mobile-first layouts, fluid grids, and touch interaction."],
+  ["ui-design", "UI", "UI Design", "Grid, spacing, hierarchy, tokens, and visual consistency."],
+  ["ui-patterns", "PAT", "UI Patterns", "Ready-made patterns for heroes, cards, forms, pricing, and CTAs."],
+  ["usability", "USE", "Usability", "Nielsen heuristics, ISO 9241, and reduced friction."],
 ];
 const skillsGrid = document.getElementById("skillsGrid");
 if (skillsGrid) {
   const divider = document.createElement("div");
   divider.className = "skill-library-divider";
-  divider.innerHTML = "<span>NOVAS SKILLS</span><small>Especialistas adicionais para o workflow</small>";
+  divider.innerHTML = "<span>MORE SKILLS</span><small>Additional specialists for your workflow</small>";
   skillsGrid.append(divider);
   for (const [id, icon, name, description] of additionalSkills) {
     const card = document.createElement("button");
@@ -463,7 +467,7 @@ if (skillsGrid) {
     skillsGrid.append(card);
   }
 }
-document.querySelectorAll("[data-skill]").forEach((card) => { card.addEventListener("click", async () => { if (!workspace.lovableProjectId) { showFeedback(`Abra um projeto do ${activeBuilderName()} antes de selecionar Skills.`); return; } const ids = await selectedSkills(); const id = card.dataset.skill; const next = ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]; await saveSelectedSkills(next); await renderSkills(); }); });
+document.querySelectorAll("[data-skill]").forEach((card) => { card.addEventListener("click", async () => { if (!workspace.lovableProjectId) { showFeedback(`Open a ${activeBuilderName()} project before selecting Skills.`); return; } const ids = await selectedSkills(); const id = card.dataset.skill; const next = ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]; await saveSelectedSkills(next); await renderSkills(); }); });
 ui.platformButtons.forEach((button) => button.addEventListener("click", async () => {
   await selectPlatform(button.dataset.platform);
   await refreshWorkspace();
@@ -471,8 +475,8 @@ ui.platformButtons.forEach((button) => button.addEventListener("click", async ()
   await refreshRunStatus();
 }));
 ui.clearSkills?.addEventListener("click", async () => { await saveSelectedSkills([]); await renderSkills(); });
-ui.refreshData?.addEventListener("click", async () => { await refreshRepository(); await refreshChat(); await refreshRunStatus(); await renderSkills(); showFeedback("Dados atualizados."); });
-ui.settings?.addEventListener("click", () => showFeedback("Ajustes avançados entram na camada comercial da LovaRPM."));
+ui.refreshData?.addEventListener("click", async () => { await refreshRepository(); await refreshChat(); await refreshRunStatus(); await renderSkills(); showFeedback("Data updated."); });
+ui.settings?.addEventListener("click", () => showFeedback("Advanced settings are part of LovaRPM's commercial tier."));
 ui.hideBadge?.addEventListener("click", async () => {
   ui.hideBadge.disabled = true;
   try { await hideLovableBadge(); } catch (error) { showFeedback(error?.message || String(error)); }

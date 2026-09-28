@@ -8,7 +8,7 @@
 
   const monitor = document.createElement("div");
   monitor.className = "lb-run-monitor";
-  monitor.innerHTML = '<div class="lb-run-activity" hidden></div><div class="lb-run-progress" aria-label="Progresso por etapas"><i></i><i></i><i></i><i></i></div><div class="lb-run-phase">Aguardando</div>';
+  monitor.innerHTML = '<div class="lb-run-activity" hidden></div><div class="lb-run-progress" aria-label="Progress by stage"><i></i><i></i><i></i><i></i></div><div class="lb-run-phase">Waiting</div>';
   main.appendChild(monitor);
   const activity = monitor.querySelector(".lb-run-activity");
   const progress = monitor.querySelector(".lb-run-progress");
@@ -16,11 +16,11 @@
   const segments = [...progress.querySelectorAll("i")];
 
   const phaseMap = {
-    sending: [1, "Enviando"],
-    working: [2, "Processando"],
-    done: [4, "Concluído"],
-    blocked: [2, "Ação necessária"],
-    error: [2, "Erro"],
+    sending: [1, "Sending"],
+    working: [2, "Working"],
+    done: [4, "Complete"],
+    blocked: [2, "Action required"],
+    error: [2, "Error"],
   };
 
   function projectId() {
@@ -29,9 +29,9 @@
 
   function render(run) {
     const status = String(run?.status || "idle").toLowerCase();
-    const [filled, label] = phaseMap[status] || [0, "Aguardando"];
+    const [filled, label] = phaseMap[status] || [0, "Waiting"];
     progress.dataset.status = status;
-    progress.setAttribute("aria-label", `Progresso por etapas: ${label}`);
+    progress.setAttribute("aria-label", `Progress by stage: ${label}`);
     phase.textContent = label;
     segments.forEach((segment, index) => {
       segment.dataset.fill = String(index < filled);

@@ -36,13 +36,13 @@
     const text = String(input.value || "").trim();
     if (!text) {
       input.focus();
-      feedback("Digite uma solicitação antes de aprimorar.");
+      feedback("Enter a request before enhancing it.");
       return;
     }
 
     const projectId = await currentProjectId();
     if (!projectId) {
-      feedback(`Abra um projeto do ${globalThis.workspace?.platform === "base44" ? "Base44" : "Lovable"} antes de aprimorar o prompt.`);
+      feedback(`Open a ${globalThis.workspace?.platform === "base44" ? "Base44" : "Lovable"} project before enhancing the prompt.`);
       return;
     }
 
@@ -51,8 +51,8 @@
     button.disabled = true;
     button.dataset.loading = "true";
     button.dataset.enhancing = "true";
-    button.title = "Aprimorando prompt…";
-    button.innerHTML = `${iconMarkup}<span class="lb-tool-label">Aprimorando...</span>`;
+    button.title = "Enhancing prompt…";
+    button.innerHTML = `${iconMarkup}<span class="lb-tool-label">Enhancing...</span>`;
     const pulseAnimation = button.animate(
       [
         { opacity: .72, transform: "scale(1)" },
@@ -65,11 +65,11 @@
     let timeoutId = null;
     try {
       const source = await findLovableTab(projectId);
-      if (!source?.id) throw new Error(`Não encontrei a aba deste projeto no ${globalThis.workspace?.platform === "base44" ? "Base44" : "Lovable"}.`);
+      if (!source?.id) throw new Error(`Could not find this project's ${globalThis.workspace?.platform === "base44" ? "Base44" : "Lovable"} tab.`);
 
       const timeout = new Promise((_, reject) => {
         timeoutId = setTimeout(
-          () => reject(new Error("O ChatGPT demorou demais para devolver o prompt aprimorado.")),
+          () => reject(new Error("ChatGPT took too long to return the enhanced prompt.")),
           110000,
         );
       });
@@ -85,7 +85,7 @@
 
       const enhanced = String(response?.text || "").trim();
       if (!response?.ok || !enhanced) {
-        throw new Error(response?.error || "O ChatGPT não devolveu um prompt aprimorado.");
+        throw new Error(response?.error || "ChatGPT did not return an enhanced prompt.");
       }
 
       input.value = enhanced;
@@ -93,7 +93,7 @@
       input.focus();
       input.setSelectionRange?.(input.value.length, input.value.length);
       button.dataset.success = "true";
-      feedback("Prompt aprimorado.");
+      feedback("Prompt enhanced.");
       setTimeout(() => { delete button.dataset.success; }, 900);
     } catch (error) {
       feedback(error instanceof Error ? error.message : String(error));
@@ -104,7 +104,7 @@
       button.disabled = false;
       button.dataset.loading = "false";
       button.dataset.enhancing = "false";
-      button.title = "Aprimorar prompt";
+      button.title = "Enhance prompt";
     }
   });
 })();

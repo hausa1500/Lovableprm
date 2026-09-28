@@ -106,11 +106,11 @@ async function ensureSubmitBridge(tabId) {
 
 async function refreshChatGptResult(projectId) {
   const id = String(projectId || "").trim();
-  if (!id) throw new Error("Projeto não informado.");
+  if (!id) throw new Error("Project ID was not provided.");
 
   const conversation = await activeProjectConversation(id);
   const tab = await resolveChatTab(conversation);
-  if (!tab?.id) throw new Error("A conversa vinculada do ChatGPT não está disponível.");
+  if (!tab?.id) throw new Error("The linked ChatGPT conversation is unavailable.");
 
   try {
     const ping = await chrome.tabs.sendMessage(tab.id, {
@@ -133,9 +133,9 @@ async function refreshChatGptResult(projectId) {
 async function forwardComposerObjective(message, sender) {
   const objective = String(message.objective || "").trim();
   const projectId = String(message.projectId || "").trim();
-  if (!objective) throw new Error("Digite o que você quer alterar.");
-  if (!projectId) throw new Error("Não foi possível identificar o projeto da plataforma.");
-  if (!sender?.tab?.id) throw new Error("A aba da plataforma não está disponível.");
+  if (!objective) throw new Error("Enter what you want to change.");
+  if (!projectId) throw new Error("Could not identify the platform project.");
+  if (!sender?.tab?.id) throw new Error("The platform tab is unavailable.");
 
   const skills = await selectedSkills(projectId);
   const response = await chrome.tabs.sendMessage(sender.tab.id, {
@@ -143,7 +143,7 @@ async function forwardComposerObjective(message, sender) {
     objective,
     skills,
   });
-  if (!response?.ok) throw new Error(response?.error || "Não foi possível enviar o pedido pela LovaRPM.");
+  if (!response?.ok) throw new Error(response?.error || "Could not send the request through LovaRPM.");
   return response;
 }
 
@@ -167,19 +167,19 @@ function withTimeout(promise, timeoutMs, message) {
 async function enhanceComposerPrompt(message, sender) {
   const text = String(message.text || "").trim();
   const projectId = String(message.projectId || "").trim();
-  if (!text) throw new Error("Digite um pedido antes de usar o Boost.");
-  if (!projectId) throw new Error("Não foi possível identificar o projeto da plataforma.");
+  if (!text) throw new Error("Enter a request before using Boost.");
+  if (!projectId) throw new Error("Could not identify the platform project.");
   const config = (await chrome.storage.local.get("config")).config || {};
-  if (config.enabled === false || config.chatgptEnabled === false) throw new Error("A integração com o ChatGPT está desativada na LovaRPM.");
+  if (config.enabled === false || config.chatgptEnabled === false) throw new Error("The ChatGPT integration is disabled in LovaRPM.");
 
   const conversation = await activeProjectConversation(projectId);
   const tab = await resolveChatTab(conversation);
-  if (!tab?.id) throw new Error("Conecte uma conversa do ChatGPT a este projeto antes de usar o Boost.");
+  if (!tab?.id) throw new Error("Connect a ChatGPT conversation to this project before using Boost.");
 
   const skills = await selectedSkills(projectId);
   const platform = sender?.tab?.url?.startsWith("https://app.base44.com/") ? "base44" : "lovable";
   const preparedPrompt = await globalThis.LovaRPMLicense?.preparePrompt?.("enhance", { text, lovableProjectId: projectId, platform, repository: String(message.repository || ""), title: String(message.title || sender?.tab?.title || ""), skills });
-  if (!preparedPrompt) throw new Error("O servidor não preparou o aprimoramento.");
+  if (!preparedPrompt) throw new Error("The server did not prepare the enhancement.");
   const prompt = withSkillInstructions(preparedPrompt, skills);
   const sourceTab = await resolveLovableSourceTab(projectId, sender?.tab || null);
   const chatWasActive = Boolean(tab.active);
@@ -189,23 +189,23 @@ async function enhanceComposerPrompt(message, sender) {
       await chrome.tabs.update(tab.id, { active: true });
       await new Promise((resolve) => setTimeout(resolve, 220));
     }
-    if (!(await ensureSubmitBridge(tab.id))) throw new Error("A ponte de envio do ChatGPT não respondeu.");
-    if (!(await ensureEnhanceBridge(tab.id))) throw new Error("A ponte de aprimoramento do ChatGPT não respondeu.");
+    if (!(await ensureSubmitBridge(tab.id))) throw new Error("The ChatGPT submission bridge did not respond.");
+    if (!(await ensureEnhanceBridge(tab.id))) throw new Error("The ChatGPT enhancement bridge did not respond.");
 
     const snapshot = await chrome.tabs.sendMessage(tab.id, { type: "LOVABURST_ENHANCE_SNAPSHOT" });
-    if (!snapshot?.ok || !snapshot.baseline) throw new Error("Não foi possível iniciar a verificação do prompt aprimorado.");
+    if (!snapshot?.ok || !snapshot.baseline) throw new Error("Could not start checking for the enhanced prompt.");
 
     const dispatched = await chrome.tabs.sendMessage(tab.id, { type: "LOVABURST_SUBMIT_TO_CHATGPT", prompt });
-    if (!dispatched?.ok) throw new Error(dispatched?.error || "O ChatGPT não confirmou o envio do pedido de aprimoramento.");
+    if (!dispatched?.ok) throw new Error(dispatched?.error || "ChatGPT did not confirm that the enhancement request was sent.");
 
     const response = await withTimeout(
       chrome.tabs.sendMessage(tab.id, { type: "LOVABURST_ENHANCE_WAIT_FOR_RESPONSE", baseline: snapshot.baseline, timeoutMs: ENHANCE_TIMEOUT_MS }),
       ENHANCE_TIMEOUT_MS + 5000,
-      "O ChatGPT demorou demais para devolver o prompt aprimorado.",
+      "ChatGPT took too long to return the enhanced prompt.",
     );
     const enhanced = String(response?.text || "").trim();
-    if (!response?.ok || !enhanced) throw new Error(response?.error || "O ChatGPT não devolveu um prompt aprimorado.");
-    if (enhanced === text) throw new Error("O ChatGPT devolveu o mesmo texto sem aprimoramento. Tente novamente.");
+    if (!response?.ok || !enhanced) throw new Error(response?.error || "ChatGPT did not return an enhanced prompt.");
+    if (enhanced === text) throw new Error("ChatGPT returned the same text without enhancement. Try again.");
     return { ok: true, text: enhanced };
   } finally {
     if (!chatWasActive && sourceTab?.id && isBuilderUrl(sourceTab.url)) {

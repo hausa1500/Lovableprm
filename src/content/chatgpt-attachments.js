@@ -84,9 +84,9 @@
   async function prepareAttachments(attachments) {
     if (!attachments.length) return { ok: true, count: 0 };
     const element = await waitForComposer();
-    if (!element) throw new Error("Campo de mensagem do ChatGPT não encontrado.");
+    if (!element) throw new Error("ChatGPT message field not found.");
     const input = fileInput(element);
-    if (!input) throw new Error("O composer atual do ChatGPT não disponibilizou o seletor de arquivos.");
+    if (!input) throw new Error("The current ChatGPT composer does not provide a file input.");
     const files = attachments.map(decode);
     const names = files.map((file) => String(file.name || "")).filter(Boolean);
     const baselineNodes = attachmentNodes(element).length;
@@ -97,11 +97,11 @@
     while (Date.now() - startedAt < 30000) {
       await sleep(220);
       const rejection = rejectionMessage(element, names);
-      if (rejection) throw new Error(`O ChatGPT recusou o anexo: ${rejection}`);
+      if (rejection) throw new Error(`ChatGPT rejected the attachment: ${rejection}`);
       const nodeCount = attachmentNodes(element).length;
       if (attachmentNamesPresent(element, names) || (nodeCount >= baselineNodes + attachments.length && attachments.length > 0)) return { ok: true, count: attachments.length };
     }
-    throw new Error(`Não foi possível anexar ${names[0] || "o arquivo"} ao ChatGPT. A mensagem não foi enviada.`);
+    throw new Error(`Could not attach ${names[0] || "the file"} to ChatGPT. The message was not sent.`);
   }
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type === "LOVABURST_ATTACHMENTS_PING") {

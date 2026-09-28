@@ -177,7 +177,7 @@
     monitor = shadow.querySelector(".lb-monitor");
     if (!monitor) {
       monitor = document.createElement("div"); monitor.className = "lb-monitor";
-      monitor.innerHTML = '<div class="lb-monitor-activity"></div><div class="lb-monitor-progress"><i></i><i></i><i></i><i></i></div><div class="lb-monitor-phase">Processando</div>';
+      monitor.innerHTML = '<div class="lb-monitor-activity"></div><div class="lb-monitor-progress"><i></i><i></i><i></i><i></i></div><div class="lb-monitor-phase">Working</div>';
       toast.appendChild(monitor);
     }
     if (positionLoaded) applyPosition(savedPosition);
@@ -195,8 +195,8 @@
     }
     lastRunStatus = status;
     if (!attach()) return;
-    const map = { sending:[1,"Enviando"], working:[2,"Processando"], done:[4,"Concluído"], blocked:[2,"Ação necessária"], error:[2,"Erro"] };
-    const [filled,label] = map[status] || [0,"Aguardando"];
+    const map = { sending:[1,"Sending"], working:[2,"Working"], done:[4,"Complete"], blocked:[2,"Action required"], error:[2,"Error"] };
+    const [filled,label] = map[status] || [0,"Waiting"];
     const progress = monitor.querySelector(".lb-monitor-progress");
     progress.dataset.status = status;
     [...progress.querySelectorAll("i")].forEach((el,index)=>{el.dataset.fill=String(index<filled);el.dataset.current=String(status!=="done"&&index===Math.max(0,filled-1));});

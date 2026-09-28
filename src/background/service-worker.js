@@ -134,17 +134,17 @@ async function getLinkedChatGptTab() {
 
 async function linkChatGptTab(tabId) {
   if (!Number.isInteger(tabId)) {
-    throw new Error("Aba do ChatGPT inválida.");
+    throw new Error("Invalid ChatGPT tab.");
   }
 
   const tab = await chrome.tabs.get(tabId);
   if (!tab?.id || !tab.url?.startsWith("https://chatgpt.com/")) {
-    throw new Error("A aba selecionada não é uma conversa do ChatGPT.");
+    throw new Error("The selected tab is not a ChatGPT conversation.");
   }
 
   const bridgeReady = await ensureChatGptBridge(tab.id);
   if (!bridgeReady) {
-    throw new Error("A ponte da LovaRPM não respondeu nessa aba do ChatGPT.");
+    throw new Error("The LovaRPM bridge did not respond in this ChatGPT tab.");
   }
 
   const link = {
@@ -366,16 +366,16 @@ const sleepBackground = (ms) => new Promise((resolve) => setTimeout(resolve, ms)
 async function relayPromptToChatGpt(payload, sourceTabId = null) {
   const config = await getConfig();
   if (config.enabled === false || config.chatgptEnabled === false) {
-    throw new Error("A integração com o ChatGPT está desativada na LovaRPM.");
+    throw new Error("The ChatGPT integration is disabled in LovaRPM.");
   }
 
   const tab = await getLinkedChatGptTab();
   if (!tab?.id) {
-    throw new Error("ChatGPT não está vinculado. Abra o painel da LovaRPM e vincule uma conversa do ChatGPT.");
+    throw new Error("ChatGPT is not linked. Open the LovaRPM panel and link a ChatGPT conversation.");
   }
 
   const preparedPrompt = await globalThis.LovaRPMLicense?.preparePrompt?.("main", payload);
-  if (!preparedPrompt) throw new Error("O servidor não preparou a operação.");
+  if (!preparedPrompt) throw new Error("The server did not prepare the operation.");
   const prompt = withSkillInstructions(preparedPrompt, payload.skills);
   let sourceTab = null;
   let activatedChatForDispatch = false;
@@ -395,15 +395,15 @@ async function relayPromptToChatGpt(payload, sourceTabId = null) {
     }
 
     const bridgeReady = await ensureChatGptBridge(tab.id);
-    if (!bridgeReady) throw new Error("A ponte do ChatGPT não respondeu após a injeção.");
+    if (!bridgeReady) throw new Error("The ChatGPT bridge did not respond after injection.");
 
     const response = await sendPromptMessage(tab.id, prompt);
     if (!response?.ok) {
-      throw new Error(response?.error || "O ChatGPT não confirmou o envio do prompt.");
+      throw new Error(response?.error || "ChatGPT did not confirm that the prompt was sent.");
     }
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(`Não foi possível ativar a ponte da LovaRPM no ChatGPT: ${detail}`);
+    throw new Error(`Could not activate the LovaRPM bridge in ChatGPT: ${detail}`);
   } finally {
     if (
       activatedChatForDispatch &&
@@ -470,7 +470,7 @@ async function handleCapturedPrompt(message, sender) {
   const payload = message.payload;
 
   if (!payload?.text || typeof payload.text !== "string" || !payload.text.trim()) {
-    return { ok: false, error: "Prompt vazio ou inválido." };
+    return { ok: false, error: "Prompt is empty or invalid." };
   }
 
   let repository = payload.repository || "";
@@ -644,7 +644,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || typeof message !== "object") return false;
   if (message.type === "LOVABURST_PREPARE_SPECIAL_OPERATION") {
     const operation = String(message.operation || "").trim();
-    if (!["create-project", "analyze-project"].includes(operation)) { sendResponse({ ok: false, error: "Operação inválida." }); return false; }
+    if (!["create-project", "analyze-project"].includes(operation)) { sendResponse({ ok: false, error: "Invalid operation." }); return false; }
     globalThis.LovaRPMLicense?.preparePrompt?.(operation, message.payload || {})
       .then((prompt) => sendResponse({ ok: true, prompt }))
       .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) }));
@@ -697,7 +697,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     getLinkedChatGptTab()
       .then(async (tab) => {
         if (!tab?.id) {
-          sendResponse({ ok: false, error: "Nenhuma conversa do ChatGPT está vinculada." });
+          sendResponse({ ok: false, error: "No ChatGPT conversation is linked." });
           return;
         }
         await chrome.tabs.update(tab.id, { active: true });

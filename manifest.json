@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "LovaRPM",
   "version": "2.9.8",
-  "description": "Extensão LovaRPM para projetos Lovable e Base44, com GitHub como fonte principal para alterações de código.",
+  "description": "LovaRPM extension for Lovable and Base44 projects, with GitHub as the primary source for code changes.",
   "permissions": [
     "storage",
     "tabs",
@@ -132,5 +132,5 @@
       ]
     }
   ],
-  "version_name": "MELHOR EXTENSAO DO BRASIL SEMPRE ATUALIZADA"
+  "version_name": "Brazil's best extension, always up to date"
 }

@@ -35,7 +35,13 @@
   }
 
   function titleOf(tab) {
-    return String(tab?.title || "ChatGPT").replace(/\s*-\s*ChatGPT\s*$/i, "").trim() || "Conversa do ChatGPT";
+    return String(tab?.title || "ChatGPT").replace(/\s*-\s*ChatGPT\s*$/i, "").trim() || "ChatGPT conversation";
+  }
+
+  function conversationTitleOf(conversation) {
+    const title = String(conversation?.lockedTitle || conversation?.title || "").replace(/\s*-\s*ChatGPT\s*$/i, "").trim();
+    if (!conversation?.lockedUrl && title === "Nova conversa · ChatGPT") return "New conversation · ChatGPT";
+    return title || "ChatGPT conversation";
   }
 
   function ensureSelector() {
@@ -47,7 +53,7 @@
     card.id = SELECTOR_ID;
     card.className = "chat-tab-selector";
     card.hidden = true;
-    card.innerHTML = '<div class="chat-tab-selector-head"><strong>Escolha a aba deste projeto</strong><span>Selecione uma aba do ChatGPT e a LovaRPM trava este projeto nela.</span></div><div class="chat-tab-selector-list" id="chatTabSelectorList"></div>';
+    card.innerHTML = '<div class="chat-tab-selector-head"><strong>Choose this project’s tab</strong><span>Select a ChatGPT tab, and LovaRPM will lock this project to it.</span></div><div class="chat-tab-selector-list" id="chatTabSelectorList"></div>';
     setup.appendChild(card);
     return card;
   }
@@ -65,7 +71,7 @@
 
   async function listTabs() {
     const response = await chrome.runtime.sendMessage({ type: "LOVABURST_LIST_CHATGPT_TABS" });
-    if (!response?.ok) throw new Error(response?.error || "Não foi possível listar abas do ChatGPT.");
+    if (!response?.ok) throw new Error(response?.error || "Could not list ChatGPT tabs.");
     return Array.isArray(response.tabs) ? response.tabs : [];
   }
 
@@ -75,7 +81,7 @@
     const list = document.getElementById("chatTabSelectorList");
     if (!card || !list) return;
     const id = projectId();
-    if (!id) throw new Error(`Abra um projeto do ${globalThis.workspace?.platform === "base44" ? "Base44" : "Lovable"} primeiro.`);
+    if (!id) throw new Error(`Open a ${globalThis.workspace?.platform === "base44" ? "Base44" : "Lovable"} project first.`);
     const tabs = await listTabs();
     card.hidden = false;
     list.replaceChildren();
@@ -83,7 +89,7 @@
       const empty = document.createElement("button");
       empty.type = "button";
       empty.className = "chat-tab-option";
-      empty.innerHTML = "<strong>Nenhuma aba do ChatGPT aberta</strong><small>Clique em Nova conversa para criar uma aba já com contexto.</small>";
+      empty.innerHTML = "<strong>No ChatGPT tabs are open</strong><small>Click New conversation to create a tab with project context.</small>";
       empty.disabled = true;
       list.append(empty);
       return;
@@ -94,16 +100,16 @@
       button.type = "button";
       button.className = "chat-tab-option";
       button.dataset.owned = owner && owner !== id ? "other" : owner === id ? "same" : "free";
-      button.innerHTML = `<strong>${titleOf(tab)}</strong><small>${tab.url || "https://chatgpt.com/"}</small><span>${owner && owner !== id ? "Travada em outro projeto" : owner === id ? "Já é a aba deste projeto" : "Livre para travar neste projeto"}</span>`;
+      button.innerHTML = `<strong>${titleOf(tab)}</strong><small>${tab.url || "https://chatgpt.com/"}</small><span>${owner && owner !== id ? "Locked to another project" : owner === id ? "Already this project’s tab" : "Available to lock to this project"}</span>`;
       button.disabled = Boolean(owner && owner !== id);
       button.addEventListener("click", async () => {
         button.disabled = true;
         try {
-          if (typeof window.linkTab !== "function") throw new Error("O vinculador do ChatGPT não está disponível.");
+          if (typeof window.linkTab !== "function") throw new Error("The ChatGPT linker is unavailable.");
           await window.linkTab(tab.tabId);
           await markLocked(tab.tabId);
           card.hidden = true;
-          feedback("Aba do ChatGPT travada para este projeto.", "success");
+          feedback("ChatGPT tab locked to this project.", "success");
           if (typeof window.refreshChat === "function") await window.refreshChat();
         } catch (error) {
           feedback(error?.message || String(error), "error");
@@ -158,7 +164,7 @@
   window.useOpenConversation = async function useSelectedOpenConversation() {
     await renderSelector();
     const help = document.getElementById("chatgptHelp");
-    if (help) help.textContent = "Selecione abaixo exatamente qual aba do ChatGPT deve ficar travada neste projeto.";
+    if (help) help.textContent = "Select exactly which ChatGPT tab should be locked to this project.";
     return { ok: true, selecting: true };
   };
 
@@ -192,7 +198,7 @@
         `CONNECTORS_TO_VERIFY_WHEN_NEEDED: GitHub, ${platformName}, Supabase`,
         "",
         "CHATGPT_TAB_LOCK:",
-        "Esta conversa foi escolhida e travada pela LovaRPM para este projeto. Não use esta conversa como contexto de outro projeto.",
+        "This conversation was selected and locked by LovaRPM for this project. Do not use it as context for another project.",
       ].join("\n");
     };
   }
@@ -207,9 +213,9 @@
       const card = document.getElementById("chatConnectedCard");
       if (card) card.dataset.locked = active?.locked ? "true" : "false";
       const badge = card?.querySelector(".connected-badge");
-      if (badge) badge.textContent = active?.locked ? "ABA TRAVADA" : "CONTEXTO ATIVO";
+      if (badge) badge.textContent = active?.locked ? "TAB LOCKED" : "ACTIVE CONTEXT";
       const memory = document.getElementById("compactMemoryState");
-      if (memory && active?.locked) memory.textContent = `${titleOf(active)} · exclusivo deste projeto`;
+      if (memory && active?.locked) memory.textContent = `${conversationTitleOf(active)} · exclusive to this project`;
       return result;
     };
   }

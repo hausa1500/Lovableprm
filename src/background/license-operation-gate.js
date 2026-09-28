@@ -5,7 +5,7 @@
     status: {
       valid: true,
       code: "active",
-      message: "Licença ativa.",
+      message: "License active.",
       lifetime: true,
       skills: ["*"],
       checkedAt: Date.now(),

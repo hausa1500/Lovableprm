@@ -8,7 +8,7 @@ function unlockedSnapshot() {
   return {
     valid: true,
     code: "active",
-    message: "Licença ativa.",
+    message: "License active.",
     customer: "Unlocked",
     serial: "LVBRPM-UNLOCK-UNLOCK-UNLOCK",
     expiresAt: null,

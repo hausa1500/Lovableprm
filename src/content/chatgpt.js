@@ -233,11 +233,11 @@
 
   async function submitPrompt(prompt, options = {}) {
     if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
-      return { ok: false, error: "Prompt vazio ou inválido." };
+      return { ok: false, error: "Prompt is empty or invalid." };
     }
 
     const composer = await waitForComposer();
-    if (!composer) return { ok: false, error: "Campo de mensagem do ChatGPT não encontrado." };
+    if (!composer) return { ok: false, error: "ChatGPT message field not found." };
 
     const originalPrompt = prompt.trim();
     const normalizedPrompt = options.implementationTask === true && !originalPrompt.startsWith(PRM_WRAPPER)
@@ -248,7 +248,7 @@
     await sleep(normalizedPrompt.length >= LARGE_PROMPT_THRESHOLD ? 180 : 120);
 
     if (!composerHasContent(composer)) {
-      return { ok: false, error: "A LovaRPM não conseguiu inserir o prompt no ChatGPT." };
+      return { ok: false, error: "LovaRPM could not insert the prompt into ChatGPT." };
     }
 
     let button = null;
@@ -271,7 +271,7 @@
       return { ok: true, confirmation: "pending" };
     } else {
       if (waitForSendReady) {
-        return { ok: false, error: "O anexo ainda não ficou pronto para envio no ChatGPT." };
+        return { ok: false, error: "The attachment is not ready to send in ChatGPT yet." };
       }
       composer.focus();
       composer.dispatchEvent(new KeyboardEvent("keydown", {
@@ -653,7 +653,7 @@
 
     if (message.type === "LOVABURST_SUBMIT_TO_CHATGPT") {
       if (busy) {
-        sendResponse({ ok: false, error: "O ChatGPT já está processando um envio da LovaRPM." });
+        sendResponse({ ok: false, error: "ChatGPT is already processing a LovaRPM submission." });
         return false;
       }
 

@@ -311,7 +311,7 @@
 
   function resetButton(button) {
     button.dataset.state = "";
-    button.textContent = "Enviar via LovaRPM";
+    button.textContent = "Send via LovaRPM";
     button.title = "";
     button.disabled = false;
   }
@@ -351,7 +351,7 @@
 
   async function activateProjectChat(workspace) {
     const projectId = workspace?.lovableProjectId || "";
-    if (!projectId) throw new Error("Não foi possível identificar o projeto Lovable.");
+    if (!projectId) throw new Error("Could not identify the Lovable project.");
 
     const stored = await chrome.storage.local.get("projectChatBindings");
     const record = stored.projectChatBindings?.[projectId];
@@ -361,7 +361,7 @@
 
     if (!conversation?.tabId) {
       throw new Error(
-        "Este projeto ainda não possui uma conversa ativa do ChatGPT. Abra o painel da LovaRPM e vincule ou crie uma conversa.",
+        "This project does not yet have an active ChatGPT conversation. Open the LovaRPM panel and link or create a conversation.",
       );
     }
 
@@ -373,7 +373,7 @@
     if (!response?.ok) {
       throw new Error(
         response?.error ||
-          "A conversa deste projeto não está disponível. Abra o painel da LovaRPM e selecione outra conversa.",
+          "This project's conversation is unavailable. Open the LovaRPM panel and select another conversation.",
       );
     }
   }
@@ -381,18 +381,18 @@
   async function capturePrompt(button) {
     const text = readComposerText(composer);
     if (!text) {
-      button.textContent = "Digite um prompt primeiro";
+      button.textContent = "Enter a prompt first";
       button.disabled = true;
       window.setTimeout(() => resetButton(button), 1400);
       return;
     }
 
     button.disabled = true;
-    button.textContent = "Detectando projeto…";
+    button.textContent = "Detecting project…";
 
     try {
       const workspace = await resolveWorkspace();
-      button.textContent = workspace.repository ? `Enviando · ${workspace.repository}` : "Enviando ao ChatGPT…";
+      button.textContent = workspace.repository ? `Sending · ${workspace.repository}` : "Sending to ChatGPT…";
 
       await rememberObjectiveForProject(workspace, text);
       await activateProjectChat(workspace);
@@ -412,27 +412,29 @@
         },
       });
 
-      if (!response?.ok) throw new Error(response?.error || "Falha ao enviar o prompt.");
+      if (!response?.ok) throw new Error(response?.error || "Failed to send the prompt.");
 
       button.dataset.state = "sent";
-      button.textContent = workspace.repository ? `Enviado · ${workspace.repository} ✓` : "Enviado ao ChatGPT ✓";
+      button.textContent = workspace.repository ? `Sent · ${workspace.repository} ✓` : "Sent to ChatGPT ✓";
       window.setTimeout(() => resetButton(button), 2200);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const needsChat =
+        message.includes("This project does not yet have an active ChatGPT conversation") ||
+        message.includes("This project's conversation is unavailable") ||
         message.includes("ainda não possui uma conversa ativa do ChatGPT") ||
         message.includes("conversa deste projeto não está disponível");
 
       if (needsChat) {
         button.dataset.state = "needs-chat";
-        button.textContent = "Conecte o ChatGPT";
-        button.title = "Abra o painel da LovaRPM para criar ou conectar uma conversa a este projeto.";
+        button.textContent = "Connect ChatGPT";
+        button.title = "Open the LovaRPM panel to create or connect a conversation to this project.";
         window.setTimeout(() => resetButton(button), 4200);
         return;
       }
 
       button.dataset.state = "error";
-      button.textContent = "Falha no envio";
+      button.textContent = "Send failed";
       button.title = message;
       console.error("[LovaRPM] Falha inesperada ao enviar o prompt:", error);
       window.setTimeout(() => resetButton(button), 2600);
@@ -447,8 +449,8 @@
       button = document.createElement("button");
       button.id = BUTTON_ID;
       button.type = "button";
-      button.textContent = "Enviar via LovaRPM";
-      button.setAttribute("aria-label", "Enviar este prompt ao ChatGPT pela LovaRPM");
+      button.textContent = "Send via LovaRPM";
+      button.setAttribute("aria-label", "Send this prompt to ChatGPT through LovaRPM");
       button.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -532,7 +534,7 @@
         : [];
 
       if (!objective) {
-        sendResponse({ ok: false, error: "Digite o que você quer alterar." });
+        sendResponse({ ok: false, error: "Enter what you want to change." });
         return false;
       }
 

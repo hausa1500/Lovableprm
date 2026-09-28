@@ -97,18 +97,18 @@ async function selectPlatform(platform) {
 }
 
 const SKILLS = {
-  "interface-premium": { name: "Interface Premium" },
-  "git-safe": { name: "Git Seguro" },
-  "tests-regression": { name: "Testes & Regressão" },
-  "responsive": { name: "Responsividade" },
+  "interface-premium": { name: "Premium Interface" },
+  "git-safe": { name: "Safe Git" },
+  "tests-regression": { name: "Testing & Regression" },
+  "responsive": { name: "Responsiveness" },
   "performance": { name: "Performance" },
-  "security-review": { name: "Segurança" },
-  "responsivo-completo": { name: "Responsivo Completo" },
-  "corrigir-projeto": { name: "Corrigir Projeto" },
-  "seguranca-e-banco": { name: "Segurança & Banco" },
-  "melhorar-ui-ux": { name: "Melhorar UI/UX" },
-  "refatorar-projeto": { name: "Refatorar Projeto" },
-  "otimizar-projeto": { name: "Otimizar Projeto" },
+  "security-review": { name: "Security Review" },
+  "responsivo-completo": { name: "Complete Responsiveness" },
+  "corrigir-projeto": { name: "Fix Project" },
+  "seguranca-e-banco": { name: "Security & Database" },
+  "melhorar-ui-ux": { name: "Improve UI/UX" },
+  "refatorar-projeto": { name: "Refactor Project" },
+  "otimizar-projeto": { name: "Optimize Project" },
   "accessibility-wcag": { name: "Accessibility (WCAG)" },
   "agent-ui-design": { name: "Agent UI Design" },
   "ai-design-workflow": { name: "AI Design Workflow" },
@@ -162,7 +162,7 @@ async function renderSkills() {
   const ids = await selectedSkills();
   document.querySelectorAll("[data-skill]").forEach((card) => card.classList.toggle("active", ids.includes(card.dataset.skill)));
   ui.skillCountBadge.textContent = String(ids.length);
-  ui.skillsSummary.textContent = ids.length ? `${ids.length} skill${ids.length === 1 ? "" : "s"} ativa${ids.length === 1 ? "" : "s"} neste projeto` : "Nenhuma skill selecionada";
+  ui.skillsSummary.textContent = ids.length ? `${ids.length} skill${ids.length === 1 ? "" : "s"} active for this project` : "No skills selected";
   ui.activeSkillsStrip.hidden = !ids.length;
   ui.activeSkillsChips.innerHTML = ids.map((id) => `<b>${SKILLS[id].name}</b>`).join("");
 }
@@ -206,15 +206,15 @@ async function renderHistory() {
   if (!ui.historyPanel) return;
   let list = ui.historyList;
   if (!list) {
-    ui.historyPanel.innerHTML = '<section class="history-card"><div class="history-head"><div><span>// HISTÓRICO</span><strong>Solicitações enviadas</strong></div></div><div id="historyList" class="history-list"></div></section>';
+    ui.historyPanel.innerHTML = '<section class="history-card"><div class="history-head"><div><span>// HISTORY</span><strong>Requests sent</strong></div></div><div id="historyList" class="history-list"></div></section>';
     list = ui.historyList = $("#historyList");
   }
   const rec = await record(workspace.lovableProjectId);
   const rawItems = Array.isArray(rec?.recentObjectives) ? rec.recentObjectives.slice().reverse() : [];
   const items = rawItems.filter((item, index) => index === 0 || String(item?.text || "") !== String(rawItems[index - 1]?.text || "")).slice(0, 50);
   list.replaceChildren();
-  if (!items.length) { const empty = document.createElement("p"); empty.className = "history-empty"; empty.textContent = "As solicitações enviadas para este projeto aparecerão aqui."; list.append(empty); return; }
-  for (const item of items) { const row = document.createElement("article"); row.className = "history-item"; const text = document.createElement("p"); text.textContent = String(item?.text || ""); const time = document.createElement("time"); const date = item?.createdAt ? new Date(item.createdAt) : null; time.textContent = date && !Number.isNaN(date.valueOf()) ? date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : ""; row.append(text, time); list.append(row); }
+  if (!items.length) { const empty = document.createElement("p"); empty.className = "history-empty"; empty.textContent = "Requests sent for this project will appear here."; list.append(empty); return; }
+  for (const item of items) { const row = document.createElement("article"); row.className = "history-item"; const text = document.createElement("p"); text.textContent = String(item?.text || ""); const time = document.createElement("time"); const date = item?.createdAt ? new Date(item.createdAt) : null; time.textContent = date && !Number.isNaN(date.valueOf()) ? date.toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" }) : ""; row.append(text, time); list.append(row); }
 }
 
 function active(rec) {
@@ -249,13 +249,13 @@ async function ensureBridge(tabId) {
 
 async function activateRelay(tabId) {
   const response = await chrome.runtime.sendMessage({ type: "LOVABURST_LINK_CHATGPT", tabId });
-  if (!response?.ok) throw new Error(response?.error || "Não foi possível ativar esta conversa.");
+  if (!response?.ok) throw new Error(response?.error || "Could not activate this conversation.");
 }
 
 async function sendDirect(tabId, prompt) {
-  if (!(await ensureBridge(tabId))) throw new Error("A ponte do ChatGPT não respondeu.");
+  if (!(await ensureBridge(tabId))) throw new Error("The ChatGPT bridge did not respond.");
   const response = await chrome.tabs.sendMessage(tabId, { type: "LOVABURST_SUBMIT_TO_CHATGPT", prompt });
-  if (!response?.ok) throw new Error(response?.error || "O ChatGPT não confirmou o envio.");
+  if (!response?.ok) throw new Error(response?.error || "ChatGPT did not confirm the submission.");
 }
 
 async function ownerOf(tab) {
@@ -271,18 +271,18 @@ async function ownerOf(tab) {
 
 async function linkTab(tabId) {
   const projectId = workspace.lovableProjectId;
-  if (!projectId) throw new Error(`Abra um projeto do ${workspace.platform === "base44" ? "Base44" : "Lovable"} primeiro.`);
+  if (!projectId) throw new Error(`Open a ${workspace.platform === "base44" ? "Base44" : "Lovable"} project first.`);
 
   const tab = await chrome.tabs.get(tabId);
   if (!tab?.id || !tab.url?.startsWith("https://chatgpt.com/")) {
-    throw new Error("A conversa selecionada não é do ChatGPT.");
+    throw new Error("The selected conversation is not a ChatGPT conversation.");
   }
 
   const owner = await ownerOf({ tabId: tab.id, url: tab.url });
   if (owner && owner !== projectId) {
-    throw new Error("Essa conversa já está vinculada a outro projeto da LovaRPM.");
+    throw new Error("This conversation is already linked to another LovaRPM project.");
   }
-  if (!(await ensureBridge(tab.id))) throw new Error("A ponte da LovaRPM não respondeu.");
+  if (!(await ensureBridge(tab.id))) throw new Error("The LovaRPM bridge did not respond.");
 
   await update(projectId, (rec) => {
     const conversations = [...rec.conversations];
@@ -339,7 +339,7 @@ async function contextPrompt(rec) {
   const supabase = integrations.supabase || {};
   const lines = objectives.length
     ? objectives.map((item, index) => `${index + 1}. ${item.text}`).join("\n")
-    : "Nenhuma solicitação anterior foi registrada localmente pela LovaRPM.";
+    : "No previous requests have been recorded locally by LovaRPM.";
 
   const platform = rec?.platform === "base44" ? "base44" : "lovable";
   const platformName = platform === "base44" ? "Base44" : "Lovable";
@@ -358,25 +358,25 @@ async function contextPrompt(rec) {
     `CONTEXT_GENERATED_AT: ${now()}`,
     "",
     "PURPOSE:",
-    "Esta conversa é dedicada exclusivamente ao repositório GitHub indicado. Não misture contexto, decisões ou código de outros projetos.",
+    "This conversation is dedicated exclusively to the specified GitHub repository. Do not mix in context, decisions, or code from other projects.",
     "",
     "RECENT_USER_OBJECTIVES:",
     lines,
     "",
     "PREVIOUS_CONVERSATION_HANDOFF:",
-    rec?.handoffExcerpt || "Nenhum trecho da conversa anterior pôde ser capturado.",
+    rec?.handoffExcerpt || "No excerpt from the previous conversation could be captured.",
     "",
     "CONTINUITY_RULES:",
-    "- Use os objetivos recentes apenas como contexto de continuidade; eles não provam o estado atual do código.",
-    "- Antes de qualquer alteração futura, inspecione o estado real do repositório GitHub indicado no novo pedido.",
-    "- Quando REPOSITORY for concreto, trate o GitHub como fonte principal e oficial do código; se for AUTO_NOT_DETECTED, não adivinhe.",
-    `- ${platformKey} é somente um identificador de associação; não abra nem tente acessar o ${platformName} para ler ou editar código.`,
-    "- Preserve trabalho existente e decisões já materializadas no repositório.",
-    "- Quando o projeto usar Supabase, confirme o projeto Supabase correto antes de alterações de backend ou banco.",
-    "- Descubra e use os conectores GitHub e Supabase disponíveis quando forem necessários.",
-    "- Não carregue suposições de outras conversas ou projetos.",
-    "- Os próximos blocos [LOVABURST_REQUEST_V3] enviados nesta conversa pertencem a este projeto, respeitando os metadados de cada bloco. Blocos V1/V2 anteriores permanecem válidos apenas como histórico de compatibilidade.",
+    "- Use recent objectives only as continuity context; they do not prove the current state of the code.",
+    "- Before any future changes, inspect the actual state of the GitHub repository specified in the new request.",
+    "- When REPOSITORY is concrete, treat GitHub as the primary and authoritative source of code; if it is AUTO_NOT_DETECTED, do not guess.",
+    `- ${platformKey} is only a linking identifier; do not open or attempt to access ${platformName} to read or edit code.`,
+    "- Preserve existing work and decisions already embodied in the repository.",
+    "- If the project uses Supabase, confirm the correct Supabase project before backend or database changes.",
+    "- Discover and use the available GitHub and Supabase connectors when needed.",
+    "- Do not carry assumptions over from other conversations or projects.",
+    "- Future [LOVABURST_REQUEST_V3] blocks sent in this conversation belong to this project and must respect each block's metadata. Earlier V1/V2 blocks remain valid only as compatibility history.",
     "",
-    "Responda apenas confirmando brevemente que o contexto deste projeto foi carregado.",
+    "Reply only with a brief confirmation that this project's context has been loaded.",
   ].join("\n");
 }

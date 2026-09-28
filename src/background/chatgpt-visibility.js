@@ -128,7 +128,7 @@ async function restoreLease(lease) {
 }
 
 async function beginWake(tab, durationMs = 7000) {
-  if (!tab?.id) throw new Error("A aba do ChatGPT não está disponível.");
+  if (!tab?.id) throw new Error("The ChatGPT tab is unavailable.");
 
   const previous = await focusedTab();
   const token = `${tab.id}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;

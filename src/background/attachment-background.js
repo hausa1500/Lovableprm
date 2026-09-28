@@ -75,7 +75,7 @@ async function chat(projectId) {
   const stored = await chrome.storage.local.get("projectChatBindings");
   const record = stored.projectChatBindings?.[projectId];
   const conversation = record?.conversations?.find((item) => item.id === record.activeConversationId);
-  if (!conversation) throw new Error("Conecte uma conversa do ChatGPT antes de enviar.");
+  if (!conversation) throw new Error("Connect a ChatGPT conversation before sending.");
 
   if (conversation.tabId) {
     try {
@@ -87,7 +87,7 @@ async function chat(projectId) {
   const tabs = await chrome.tabs.query({ url: ["https://chatgpt.com/*"] });
   const exact = tabs.find((tab) => conversation.url && tab.url === conversation.url);
   if (exact) return exact;
-  throw new Error("A conversa vinculada do ChatGPT não está disponível.");
+  throw new Error("The linked ChatGPT conversation is unavailable.");
 }
 
 async function ensureBridges(tabId) {
@@ -105,7 +105,7 @@ async function ensureBridges(tabId) {
 
   await chrome.scripting.executeScript({ target: { tabId }, files: ["src/content/chatgpt-attachments.js"] });
   const ping = await chrome.tabs.sendMessage(tabId, { type: "LOVABURST_ATTACHMENTS_PING" });
-  if (!ping?.ok || ping.version !== ATTACHMENT_BRIDGE_VERSION) throw new Error("A ponte de anexos atual da LovaRPM não respondeu no ChatGPT.");
+  if (!ping?.ok || ping.version !== ATTACHMENT_BRIDGE_VERSION) throw new Error("The current LovaRPM attachment bridge did not respond in ChatGPT.");
 }
 
 async function submit(message, sender) {
@@ -113,12 +113,12 @@ async function submit(message, sender) {
   const attachments = Array.isArray(message.attachments) ? message.attachments.slice(0, 5) : [];
   const projectId = String(message.projectId || "").trim();
 
-  if (!text && !attachments.length) throw new Error("Digite uma mensagem ou adicione um anexo.");
-  if (!projectId) throw new Error("Não foi possível identificar o projeto da plataforma.");
+  if (!text && !attachments.length) throw new Error("Enter a message or add an attachment.");
+  if (!projectId) throw new Error("Could not identify the platform project.");
 
   const stored = await chrome.storage.local.get(["workspaceBindings", "config"]);
   if (stored.config?.enabled === false || stored.config?.chatgptEnabled === false) {
-    throw new Error("A integração com o ChatGPT está desativada.");
+    throw new Error("The ChatGPT integration is disabled.");
   }
 
   const repository = String(message.repository || stored.workspaceBindings?.[projectId]?.repository || "");
@@ -135,7 +135,7 @@ async function submit(message, sender) {
   };
 
   const preparedPrompt = await globalThis.LovaRPMLicense?.preparePrompt?.("main", payload);
-  if (!preparedPrompt) throw new Error("O servidor não preparou a operação com anexos.");
+  if (!preparedPrompt) throw new Error("The server did not prepare the attachment operation.");
   const prompt = withSkillInstructions(preparedPrompt, payload.skills);
   const tab = await chat(projectId);
   const source = sender?.tab?.id ? await chrome.tabs.get(sender.tab.id).catch(() => null) : null;
@@ -162,7 +162,7 @@ async function submit(message, sender) {
       attachments,
     });
     if (!prepared?.ok || Number(prepared.count || 0) !== attachments.length) {
-      throw new Error(prepared?.error || `Não foi possível anexar ${attachments[0]?.name || "o arquivo"} ao ChatGPT. A mensagem não foi enviada.`);
+      throw new Error(prepared?.error || `Could not attach ${attachments[0]?.name || "the file"} to ChatGPT. The message was not sent.`);
     }
 
     const dispatched = await chrome.tabs.sendMessage(tab.id, {
@@ -171,7 +171,7 @@ async function submit(message, sender) {
       implementationTask: true,
     });
     if (!dispatched?.ok) {
-      throw new Error(dispatched?.error || "O ChatGPT não confirmou o envio da mensagem.");
+      throw new Error(dispatched?.error || "ChatGPT did not confirm that the message was sent.");
     }
 
     await status(projectId, {

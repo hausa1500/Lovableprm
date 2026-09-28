@@ -25,8 +25,8 @@
 
   function sendMarkup(sending) {
     return sending
-      ? '<span class="lb-send-spinner" aria-hidden="true"></span><span class="lb-tool-label">Enviando</span>'
-      : actionMarkup("send", "Enviar");
+      ? '<span class="lb-send-spinner" aria-hidden="true"></span><span class="lb-tool-label">Sending</span>'
+      : actionMarkup("send", "Send");
   }
 
   function renderSendVisual(sending) {
@@ -47,10 +47,10 @@
     const clear = document.getElementById("lbClearComposerButton");
     const chat = document.getElementById("lbChatIndicator");
 
-    if (attach) attach.innerHTML = actionMarkup("paperclip", "Anexar");
-    if (enhance) enhance.innerHTML = actionMarkup("sparkles", "Aprimorar");
-    if (mic) mic.innerHTML = actionMarkup("microphone", "Ditado");
-    if (clear) clear.innerHTML = actionMarkup("trash", "Limpar");
+    if (attach) attach.innerHTML = actionMarkup("paperclip", "Attach");
+    if (enhance) enhance.innerHTML = actionMarkup("sparkles", "Enhance");
+    if (mic) mic.innerHTML = actionMarkup("microphone", "Dictate");
+    if (clear) clear.innerHTML = actionMarkup("trash", "Clear");
     if (chat) {
       const state = chat.dataset.state || "checking";
       chat.innerHTML = `<i></i><span class="lb-chat-name">ChatGPT</span><span class="lb-chat-chevron">${ICONS.chevron}</span>`;
@@ -58,16 +58,16 @@
     }
 
     if (mic && sendButton.nextElementSibling !== mic) toolbar.insertBefore(sendButton, mic);
-    sendButton.title = "Enviar";
-    sendButton.setAttribute("aria-label", "Enviar");
+    sendButton.title = "Send";
+    sendButton.setAttribute("aria-label", "Send");
     renderSendVisual(false);
   }
 
   function watchSendState() {
     new MutationObserver(() => {
       const rawText = String(sendButton.textContent || "");
-      if (/Enviando/i.test(rawText)) sendButton.dataset.sending = "true";
-      else if (/Enviar/i.test(rawText)) sendButton.dataset.sending = "false";
+      if (/Sending|Enviando/i.test(rawText)) sendButton.dataset.sending = "true";
+      else if (/Send|Enviar/i.test(rawText)) sendButton.dataset.sending = "false";
       renderSendVisual(sendButton.dataset.sending === "true");
     }).observe(sendButton, { childList: true, subtree: true, characterData: true });
   }
@@ -77,9 +77,9 @@
     if (!oldButton) return;
     const button = oldButton.cloneNode(true);
     oldButton.replaceWith(button);
-    button.innerHTML = actionMarkup("microphone", "Ditado");
-    button.title = "Ditado por voz";
-    button.setAttribute("aria-label", "Ditado por voz");
+    button.innerHTML = actionMarkup("microphone", "Dictate");
+    button.title = "Voice dictation";
+    button.setAttribute("aria-label", "Voice dictation");
 
     let listening = false;
 
@@ -161,7 +161,7 @@
       event.preventDefault();
       const tab = await lovableTab();
       if (!tab?.id) {
-        show("Abra o projeto no Lovable antes de usar o microfone.");
+        show("Open a Lovable project before using the microphone.");
         return;
       }
 
@@ -172,8 +172,8 @@
 
       listening = true;
       button.dataset.listening = "true";
-      button.title = "Ouvindo... Clique para parar";
-      show("Ouvindo pelo microfone do Lovable...");
+      button.title = "Listening... Click to stop";
+      show("Listening through the Lovable microphone...");
       const baseText = String(input.value || "").trimEnd();
 
       try {
@@ -184,26 +184,26 @@
           input.dispatchEvent(new Event("input", { bubbles: true }));
           input.focus();
           input.setSelectionRange?.(input.value.length, input.value.length);
-          show("Ditado inserido.");
+          show("Dictation inserted.");
           return;
         }
 
         const error = String(result?.error || "");
         if (error === "NotAllowedError" || error === "service-not-allowed" || error === "not-allowed") {
-          show("Acesso ao microfone bloqueado no Lovable. Verifique a permissão do site e tente novamente.");
+          show("Microphone access is blocked on Lovable. Check the site permission and try again.");
         } else if (error === "NotFoundError" || error === "audio-capture") {
-          show("Nenhum microfone disponível foi encontrado.");
+          show("No microphone was found.");
         } else if (error === "unsupported-media" || error === "unsupported-speech") {
-          show("O navegador não disponibilizou ditado por voz nesta página.");
+          show("Voice dictation is unavailable on this page in this browser.");
         } else if (error !== "aborted" && error !== "no-speech") {
-          show("Não foi possível iniciar o ditado por voz.");
+          show("Could not start voice dictation.");
         }
       } catch (error) {
-        show(error instanceof Error ? error.message : "Não foi possível iniciar o ditado por voz.");
+        show(error instanceof Error ? error.message : "Could not start voice dictation.");
       } finally {
         listening = false;
         button.dataset.listening = "false";
-        button.title = "Ditado por voz";
+        button.title = "Voice dictation";
       }
     });
   }
@@ -227,11 +227,11 @@
     settings: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.5-2.5 1a7 7 0 0 0-1.7-1L14.4 3h-4.8L9.3 6a7 7 0 0 0-1.7 1L5.1 6 3 9.5 5.1 11a7 7 0 0 0 0 2L3 14.5 5.1 18l2.5-1a7 7 0 0 0 1.7 1l.3 3h4.8l.3-3a7 7 0 0 0 1.7-1l2.5 1 2-3.5-2-1.5a7 7 0 0 0 .1-1Z"/></svg>'
   };
   const specs = [
-    ['hideLovableBadgeButton','badge','Remover marca d’água'],
-    ['downloadProjectButton','download','Baixar projeto'],
-    ['createProjectButton','create','Criar Projeto'],
-    ['analyzeProjectButton','analyze','Analisar Projeto'],
-    ['settingsButton','settings','Ajustes']
+    ['hideLovableBadgeButton','badge','Remove badge'],
+    ['downloadProjectButton','download','Download project'],
+    ['createProjectButton','create','Create Project'],
+    ['analyzeProjectButton','analyze','Analyze Project'],
+    ['settingsButton','settings','Settings']
   ];
   function decorate() {
     for (const [id,icon,label] of specs) {

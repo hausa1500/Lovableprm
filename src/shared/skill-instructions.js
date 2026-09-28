@@ -1,18 +1,18 @@
 const SKILL_INSTRUCTIONS = Object.freeze({
   "interface-premium": {
-    name: "Interface Premium",
+    name: "Premium Interface",
     instruction: "Create a distinctive, polished interface with deliberate hierarchy, spacing, typography, and interaction states. Prefer coherent product-specific design over generic decoration, and preserve usability and responsive behavior.",
   },
   "git-safe": {
-    name: "Git Seguro",
+    name: "Safe Git",
     instruction: "Inspect repository status and diffs before editing. Preserve unrelated user changes, make the smallest focused patch, avoid destructive Git commands and force pushes, and verify the final diff and relevant checks.",
   },
   "tests-regression": {
-    name: "Testes & Regressão",
+    name: "Testing & Regression",
     instruction: "Identify the behavior affected by the change and validate its success, failure, and important edge cases with the narrowest relevant tests. Preserve existing behavior and state clearly which checks could not be run.",
   },
   responsive: {
-    name: "Responsividade",
+    name: "Responsiveness",
     instruction: "Design and verify the requested experience across narrow and wide viewports. Prevent overflow, clipped content, unstable controls, and unusable touch targets while preserving the desktop workflow.",
   },
   performance: {
@@ -20,31 +20,31 @@ const SKILL_INSTRUCTIONS = Object.freeze({
     instruction: "Prioritize measurable bottlenecks and reduce unnecessary work, network activity, memory use, and rendering cost without weakening correctness. Avoid speculative optimization and validate meaningful performance changes.",
   },
   "security-review": {
-    name: "Segurança",
+    name: "Security Review",
     instruction: "Consider trust boundaries, input validation, authentication, authorization, data exposure, and least privilege relevant to this task. Do not expose secrets or weaken existing controls; distinguish verified vulnerabilities from speculation.",
   },
   "responsivo-completo": {
-    name: "Responsivo Completo",
+    name: "Complete Responsiveness",
     instruction: "Review the affected screens at mobile, tablet, and desktop sizes, including orientation changes and long content. Correct layout, overflow, sizing, and touch interaction issues without changing unrelated behavior.",
   },
   "corrigir-projeto": {
-    name: "Corrigir Projeto",
+    name: "Fix Project",
     instruction: "Reproduce or isolate the reported failure, trace it to its root cause, and apply the smallest fix that restores the requested behavior. Add or run a regression check and avoid unrelated cleanup.",
   },
   "seguranca-e-banco": {
-    name: "Segurança & Banco",
+    name: "Security & Database",
     instruction: "For relevant data-layer changes, verify authorization at the data boundary, row-level access rules, input constraints, and safe handling of migrations and secrets. Preserve existing access policy and report any unverified assumptions.",
   },
   "melhorar-ui-ux": {
-    name: "Melhorar UI/UX",
+    name: "Improve UI/UX",
     instruction: "Improve clarity, feedback, hierarchy, and task completion in the requested user flow. Keep controls predictable and accessible, retain existing capabilities, and avoid adding steps or visual changes unrelated to the request.",
   },
   "refatorar-projeto": {
-    name: "Refatorar Projeto",
+    name: "Refactor Project",
     instruction: "Improve structure only where it directly serves the requested work. Preserve public behavior and interfaces, keep the refactor bounded, and use relevant tests or comparisons to detect regressions.",
   },
   "otimizar-projeto": {
-    name: "Otimizar Projeto",
+    name: "Optimize Project",
     instruction: "Find the specific cost or latency relevant to the task, prefer simple changes with measurable benefit, and preserve correctness and maintainability. Do not add caching, concurrency, or complexity without evidence it helps.",
   },
   "accessibility-wcag": {

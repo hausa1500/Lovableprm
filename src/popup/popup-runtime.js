@@ -54,9 +54,9 @@ async function sendContext() {
   const projectId = workspace.lovableProjectId;
   const rec = await record(projectId);
   const conversation = active(rec);
-  if (!rec || !conversation) throw new Error("Nenhuma conversa ativa para este projeto.");
+  if (!rec || !conversation) throw new Error("No active conversation is linked to this project.");
   const tab = await resolveTab(conversation);
-  if (!tab?.id) throw new Error("A conversa ativa não está aberta.");
+  if (!tab?.id) throw new Error("The active conversation is not open.");
 
   await activateRelay(tab.id);
   await sendDirect(tab.id, await contextPrompt(rec));
@@ -94,7 +94,7 @@ async function waitChat(tabId, timeout = 20000) {
 
 async function newConversation(options = {}) {
   const projectId = workspace.lovableProjectId;
-  if (!projectId) throw new Error(`Abra um projeto do ${workspace.platform === "base44" ? "Base44" : "Lovable"} primeiro.`);
+  if (!projectId) throw new Error(`Open a ${workspace.platform === "base44" ? "Base44" : "Lovable"} project first.`);
   const initialPrompt = String(options.initialPrompt || "").trim();
 
   if (!initialPrompt) await collectHandoffFromActiveConversation();
@@ -127,7 +127,7 @@ async function newConversation(options = {}) {
   }));
 
   const loaded = await waitChat(tab.id);
-  if (!loaded?.id) throw new Error("A nova conversa do ChatGPT não carregou.");
+  if (!loaded?.id) throw new Error("The new ChatGPT conversation did not load.");
 
   await update(projectId, (rec) => ({
     ...rec,
@@ -254,20 +254,20 @@ function renderWorkspace(data = {}) {
   ui.refreshRepo.disabled = !workspace.lovableProjectId;
 
   if (workspace.outsideLovable) {
-    ui.repo.textContent = `Abra um projeto no ${workspace.platform === "base44" ? "Base44" : "Lovable"}`;
-    ui.repoState.textContent = "Sem projeto";
+    ui.repo.textContent = `Open a project in ${workspace.platform === "base44" ? "Base44" : "Lovable"}`;
+    ui.repoState.textContent = "No project";
     ui.repoState.className = "state-pill is-empty";
   } else if (data.detecting) {
-    ui.repo.textContent = "Detectando repositório…";
-    ui.repoState.textContent = "Atualizando";
+    ui.repo.textContent = "Detecting repository…";
+    ui.repoState.textContent = "Updating";
     ui.repoState.className = "state-pill";
   } else if (workspace.repository) {
     ui.repo.textContent = workspace.repository;
-    ui.repoState.textContent = data.remembered ? "Projeto ativo" : "Conectado";
+    ui.repoState.textContent = data.remembered ? "Active project" : "Connected";
     ui.repoState.className = "state-pill is-connected";
   } else {
-    ui.repo.textContent = "Repositório não detectado";
-    ui.repoState.textContent = "Sem GitHub";
+    ui.repo.textContent = "Repository not detected";
+    ui.repoState.textContent = "No GitHub repository";
     ui.repoState.className = "state-pill is-empty";
   }
 }

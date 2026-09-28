@@ -16,7 +16,7 @@
 
   const zone = document.createElement("div");
   zone.className = "lb-attachment-zone";
-  zone.innerHTML = '<div class="lb-attachment-list" hidden></div><button class="lb-attach-button" type="button" title="Anexar arquivo" aria-label="Anexar arquivo">📎 <span>Anexar</span></button><input class="lb-file-input" type="file" multiple hidden>';
+  zone.innerHTML = '<div class="lb-attachment-list" hidden></div><button class="lb-attach-button" type="button" title="Attach file" aria-label="Attach file">📎 <span>Attach</span></button><input class="lb-file-input" type="file" multiple hidden>';
   input.closest(".editor")?.insertAdjacentElement("afterend", zone);
 
   const list = zone.querySelector(".lb-attachment-list");
@@ -29,8 +29,8 @@
       const row = document.createElement("div");
       row.className = "lb-attachment";
       row.innerHTML = item.url
-        ? '<img alt=""><span class="lb-attachment-name"></span><button class="lb-attachment-remove" type="button" aria-label="Remover">×</button>'
-        : '<span class="lb-file-icon"></span><span class="lb-attachment-name"></span><button class="lb-attachment-remove" type="button" aria-label="Remover">×</button>';
+        ? '<img alt=""><span class="lb-attachment-name"></span><button class="lb-attachment-remove" type="button" aria-label="Remove">×</button>'
+        : '<span class="lb-file-icon"></span><span class="lb-attachment-name"></span><button class="lb-attachment-remove" type="button" aria-label="Remove">×</button>';
       const icon = row.querySelector(".lb-file-icon");
       if (icon) icon.textContent = (item.name.split(".").pop() || "FILE").toUpperCase().slice(0, 8);
       row.querySelector(".lb-attachment-name").textContent = item.name;
@@ -66,7 +66,7 @@
     if (sending || !selected.length) return;
     const activeWorkspace = getWorkspace();
     if (!activeWorkspace?.lovableProjectId) {
-      if (typeof showFeedback === "function") showFeedback(`Abra o projeto do ${activeWorkspace?.platform === "base44" ? "Base44" : "Lovable"} que você quer alterar.`);
+      if (typeof showFeedback === "function") showFeedback(`Open the ${activeWorkspace?.platform === "base44" ? "Base44" : "Lovable"} project you want to change.`);
       return;
     }
     sending = true;
@@ -82,12 +82,12 @@
         url: activeWorkspace.sourceUrl || "",
         title: activeWorkspace.sourceTitle || ""
       });
-      if (!response?.ok) throw new Error(response?.error || "Não foi possível enviar os anexos.");
+      if (!response?.ok) throw new Error(response?.error || "Could not send the attachments.");
       input.value = "";
       while (selected.length) attachmentsApi.release(selected.pop());
       render();
       input.dispatchEvent(new Event("input", { bubbles: true }));
-      if (typeof showFeedback === "function") showFeedback("Enviado ao ChatGPT.");
+      if (typeof showFeedback === "function") showFeedback("Sent to ChatGPT.");
     } catch (error) {
       if (typeof showFeedback === "function") showFeedback(error instanceof Error ? error.message : String(error));
     } finally {
