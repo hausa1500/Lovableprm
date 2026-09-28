@@ -1,6 +1,6 @@
 (() => {
   const licenseMeta = document.querySelector(".license-meta");
-  if (licenseMeta) licenseMeta.textContent = "License status is checked with Happy Little when protected work is requested.";
+  if (licenseMeta) licenseMeta.textContent = "LovaRPM securely verifies license status when protected work is requested.";
   const gate = document.getElementById("licenseGate");
   const shell = document.querySelector(".app-shell");
   const form = document.getElementById("licenseForm");
@@ -17,20 +17,20 @@
   customerNameInput?.closest(".license-field")?.remove();
   const resetLabel = resetButton?.querySelector("span");
   if (resetLabel) resetLabel.textContent = "Deactivate this device";
-  if (resetButton) resetButton.title = "Deactivate this device using the Happy Little licensing service.";
+  if (resetButton) resetButton.title = "Deactivate this device from LovaRPM.";
   resetButton?.nextElementSibling?.remove();
   const customerLabel = document.querySelector("#licenseDetailsSummary > div:first-child > span");
   if (customerLabel) customerLabel.textContent = "PRODUCT";
   const notice = document.querySelector(".license-notice span");
-  if (notice) notice.textContent = "Enter the license key issued by Happy Little for the browser-extension-core product.";
+  if (notice) notice.textContent = "Enter your LovaRPM license key to activate the extension.";
   const keyLabel = document.querySelector("label[for='licenseKeyInput'] span") || input?.closest("label")?.querySelector("span");
-  if (keyLabel) keyLabel.textContent = "HAPPY LITTLE LICENSE KEY";
+  if (keyLabel) keyLabel.textContent = "LOVARPM LICENSE KEY";
   if (input) {
     input.placeholder = "LXC-XXXXX-XXXXX-XXXXX-XXXXX";
     input.maxLength = 100;
   }
   const cloudBadge = document.querySelector(".license-cloud-badge");
-  if (cloudBadge) cloudBadge.textContent = "HAPPY LITTLE";
+  if (cloudBadge) cloudBadge.textContent = "LOVARPM";
 
   if (summary && expiryValue && statusValue) {
     const clientBlock = summary.firstElementChild;
@@ -104,15 +104,15 @@
   form?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const key = String(input?.value || "").trim().toUpperCase();
-    if (key.length < 16 || key.length > 100) return setFeedback("Enter the Happy Little license key.");
+    if (key.length < 16 || key.length > 100) return setFeedback("Enter your LovaRPM license key.");
     button.disabled = true;
-    setFeedback("Activating with Happy Little…", "warning");
+    setFeedback("Activating your LovaRPM license…", "warning");
     try {
       const response = await chrome.runtime.sendMessage({ type:"LOVARPM_LICENSE_ACTIVATE", key });
       const status = response?.status || { valid:false, code:"provider_error", message:"Could not activate the license." };
       showStatus(status);
       if (status.valid) setFeedback("License activated.", "success");
-    } catch { showStatus({ valid:false, code:"provider_error", message:"Could not connect to Happy Little. Protected features remain locked." }); }
+    } catch { showStatus({ valid:false, code:"provider_error", message:"Could not connect to the license service. Protected features remain locked." }); }
     finally { button.disabled = false; }
   });
 
@@ -123,7 +123,7 @@
     try {
       const response = await chrome.runtime.sendMessage({ type:"LOVARPM_LICENSE_DEACTIVATE" });
       showStatus(response?.status || { valid:false, code:"provider_error", message:"Could not deactivate this device." });
-    } catch { showStatus({ valid:false, code:"provider_error", message:"Could not connect to Happy Little. The current license state could not be changed." }); }
+    } catch { showStatus({ valid:false, code:"provider_error", message:"Could not connect to the license service. The current license state could not be changed." }); }
     finally { resetButton.disabled = false; }
   });
 

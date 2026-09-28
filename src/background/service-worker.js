@@ -403,7 +403,10 @@ async function relayPromptToChatGpt(payload, sourceTabId = null) {
     }
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(`Could not activate the LovaRPM bridge in ChatGPT: ${detail}`);
+    const failure = /license|protected features remain locked/i.test(detail)
+      ? "LovaRPM license authorization failed"
+      : "Could not activate the LovaRPM bridge in ChatGPT";
+    throw new Error(`${failure}: ${detail}`);
   } finally {
     if (
       activatedChatForDispatch &&
