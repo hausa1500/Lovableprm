@@ -85,8 +85,20 @@
     if (!attachments.length) return { ok: true, count: 0 };
     const element = await waitForComposer();
     if (!element) throw new Error("ChatGPT message field not found.");
+    let authorization;
+    try {
+      authorization = await chrome.runtime.sendMessage({ type: "LOVARPM_LICENSE_AUTHORIZE" });
+    } catch {
+      throw new Error("Could not verify the LovaRPM license. Protected features remain locked.");
+    }
+    const remainingMs = Number(authorization?.remainingMs);
+    if (!authorization?.ok || !authorization.status?.valid || !Number.isFinite(remainingMs) || remainingMs <= 250) {
+      throw new Error(authorization?.status?.message || "A valid LovaRPM license is required.");
+    }
+    const authorizationDeadline = performance.now() + remainingMs;
     const input = fileInput(element);
     if (!input) throw new Error("The current ChatGPT composer does not provide a file input.");
+    if (performance.now() + 250 >= authorizationDeadline) throw new Error("The license expired before the attachments could be added.");
     const files = attachments.map(decode);
     const names = files.map((file) => String(file.name || "")).filter(Boolean);
     const baselineNodes = attachmentNodes(element).length;

@@ -239,6 +239,18 @@
     const composer = await waitForComposer();
     if (!composer) return { ok: false, error: "ChatGPT message field not found." };
 
+    let authorization;
+    try {
+      authorization = await chrome.runtime.sendMessage({ type: "LOVARPM_LICENSE_AUTHORIZE" });
+    } catch {
+      return { ok: false, error: "Could not verify the LovaRPM license. Protected features remain locked." };
+    }
+    const remainingMs = Number(authorization?.remainingMs);
+    if (!authorization?.ok || !authorization.status?.valid || !Number.isFinite(remainingMs) || remainingMs <= 0) {
+      return { ok: false, error: authorization?.status?.message || "A valid LovaRPM license is required." };
+    }
+    const authorizationDeadline = performance.now() + remainingMs;
+
     const originalPrompt = prompt.trim();
     const normalizedPrompt = options.implementationTask === true && !originalPrompt.startsWith(PRM_WRAPPER)
       ? `${PRM_WRAPPER}\n\n${originalPrompt}`
@@ -259,6 +271,11 @@
       button = findSendButton(composer);
       if (button) break;
       await sleep(attemptDelay);
+    }
+
+    if (performance.now() + 250 >= authorizationDeadline) {
+      if (readComposer(composer).trim() === normalizedPrompt) setComposerText(composer, "");
+      return { ok: false, error: "The license expired before the request could be sent." };
     }
 
     if (button) {

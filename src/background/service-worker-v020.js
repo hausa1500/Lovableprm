@@ -1,6 +1,5 @@
 import "./runtime-integrity.js";
 import "./license-background.js";
-import "./license-operation-gate.js";
 import "./chatgpt-visibility.js";
 import "./update-refresh.js";
 import "./service-worker.js";

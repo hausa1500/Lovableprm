@@ -1,29 +1,6 @@
 (() => {
-  try {
-    const status = {
-      valid: true,
-      code: "active",
-      message: "License active.",
-      customer: "Unlocked",
-      serial: "LVBRPM-UNLOCK-UNLOCK-UNLOCK",
-      expiresAt: null,
-      lifetime: true,
-      skills: ["*"],
-      resetsRemaining: 99,
-      grace: false,
-      checkedAt: Date.now(),
-    };
-    chrome.storage.local.set({
-      lovarpmLicenseSnapshot: status,
-      lovarpmLicenseSerial: status.serial,
-      lovarpmLicenseCustomerName: status.customer,
-      lovarpmLicenseLastSuccessAt: Date.now(),
-    });
-  } catch (_) {}
-})();
-(() => {
   const licenseMeta = document.querySelector(".license-meta");
-  if (licenseMeta) licenseMeta.textContent = "Activation is linked to this installation. The serial is validated online by the server.";
+  if (licenseMeta) licenseMeta.textContent = "License status is checked with Happy Little when protected work is requested.";
   const gate = document.getElementById("licenseGate");
   const shell = document.querySelector(".app-shell");
   const form = document.getElementById("licenseForm");
@@ -37,11 +14,30 @@
   const customerNameInput = document.getElementById("licenseCustomerNameInput");
   let lastStatus = null;
 
+  customerNameInput?.closest(".license-field")?.remove();
+  const resetLabel = resetButton?.querySelector("span");
+  if (resetLabel) resetLabel.textContent = "Deactivate this device";
+  if (resetButton) resetButton.title = "Deactivate this device using the Happy Little licensing service.";
+  resetButton?.nextElementSibling?.remove();
+  const customerLabel = document.querySelector("#licenseDetailsSummary > div:first-child > span");
+  if (customerLabel) customerLabel.textContent = "PRODUCT";
+  const notice = document.querySelector(".license-notice span");
+  if (notice) notice.textContent = "Enter the license key issued by Happy Little for the browser-extension-core product.";
+  const keyLabel = document.querySelector("label[for='licenseKeyInput'] span") || input?.closest("label")?.querySelector("span");
+  if (keyLabel) keyLabel.textContent = "HAPPY LITTLE LICENSE KEY";
+  if (input) {
+    input.placeholder = "LXC-XXXXX-XXXXX-XXXXX-XXXXX";
+    input.maxLength = 100;
+  }
+  const cloudBadge = document.querySelector(".license-cloud-badge");
+  if (cloudBadge) cloudBadge.textContent = "HAPPY LITTLE";
+
   if (summary && expiryValue && statusValue) {
     const clientBlock = summary.firstElementChild;
     const statusLabel = summary.querySelector(".license-summary-status-label");
     const clientLabel = clientBlock?.querySelector(":scope > span");
     const clientName = clientBlock?.querySelector(":scope > strong");
+    if (clientLabel) clientLabel.textContent = "PRODUCT";
     const expiryRow = document.createElement("div"); expiryRow.className = "license-expiry-row";
     const expiryLabel = document.createElement("span"); expiryLabel.textContent = "Expires:"; expiryRow.append(expiryLabel, expiryValue);
     const statusRow = document.createElement("div"); statusRow.className = "license-status-row"; if (statusLabel) statusRow.append(statusLabel); statusRow.append(statusValue);
@@ -59,99 +55,81 @@
     if (!valid) return;
     summary.style.display = "grid";
     const name = summary.querySelector("[data-license-name]");
-    const stored = await chrome.storage.local.get("lovarpmLicenseCustomerName");
-    if (name) name.textContent = status.customer || stored.lovarpmLicenseCustomerName || "—";
+    if (name) name.textContent = "LovaRPM";
     if (expiryValue) {
       const date = status.expiresAt ? new Date(status.expiresAt) : null;
-      expiryValue.textContent = status.lifetime ? "Lifetime" : date && !Number.isNaN(date.getTime()) ? date.toLocaleString("en-US", { dateStyle:"short", timeStyle:"short" }) : "—";
+      expiryValue.textContent = date && !Number.isNaN(date.getTime()) ? date.toLocaleString("en-US", { dateStyle:"short", timeStyle:"short" }) : "—";
     }
     if (statusValue) {
-      statusValue.textContent = status.grace ? "OFFLINE" : "ACTIVE";
-      statusValue.dataset.state = status.grace ? "warning" : "active";
+      statusValue.textContent = "ACTIVE";
+      statusValue.dataset.state = "active";
     }
   };
 
-  const showLocked = (_status) => {
-    const unlocked = { valid:true, code:"active", message:"License active.", customer:"Unlocked", serial:"LVBRPM-UNLOCK-UNLOCK-UNLOCK", lifetime:true, expiresAt:null, skills:["*"], checkedAt:Date.now() };
-    lastStatus = unlocked;
-    renderLicenseSummary(unlocked);
-    if (shell) shell.dataset.licenseLocked = "false";
-    if (gate) { gate.hidden = true; gate.style.display = "none"; }
+  const setGate = (locked) => {
+    if (gate) {
+      gate.hidden = !locked;
+      gate.style.removeProperty("display");
+    }
+    if (shell) {
+      shell.dataset.licenseLocked = String(locked);
+      shell.dataset.licenseReady = "true";
+    }
+    if (resetButton) resetButton.hidden = locked;
   };
 
-  const showUnlocked = (status) => {
+  const showStatus = (status) => {
     lastStatus = status || null;
-    renderLicenseSummary(status);
-    if (gate) gate.hidden = true;
-    if (shell) shell.dataset.licenseLocked = "false";
+    const valid = status?.valid === true && status?.code === "active";
+    setGate(!valid);
+    if (valid) {
+      renderLicenseSummary(status);
+      setFeedback("");
+    } else {
+      renderLicenseSummary(null);
+      if (status?.message) setFeedback(status.message, status.code === "unlicensed" ? "warning" : "error");
+    }
   };
 
   async function loadStatus(force = false) {
-    const unlocked = { valid:true, code:"active", message:"License active.", customer:"Unlocked", serial:"LVBRPM-UNLOCK-UNLOCK-UNLOCK", lifetime:true, expiresAt:null, skills:["*"], checkedAt:Date.now() };
+    setGate(true);
     try {
       const response = await chrome.runtime.sendMessage({ type:"LOVARPM_LICENSE_STATUS", force });
-      showUnlocked(response?.status?.valid ? response.status : unlocked);
+      showStatus(response?.status || { valid:false, code:"provider_error", message:"Could not verify the license." });
     } catch {
-      showUnlocked(unlocked);
+      showStatus({ valid:false, code:"provider_error", message:"Could not verify the license. Protected features remain locked." });
     }
   }
 
   form?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const key = String(input?.value || "").replace(/\s+/g, "").toUpperCase();
-    const customer = String(customerNameInput?.value || "").normalize("NFKC").replace(/\s+/g, " ").trim();
-    if (!customer) return setFeedback("Enter the customer's name.");
-    if (!/^LVBRPM-[A-HJ-NP-Z2-9]{5}-[A-HJ-NP-Z2-9]{5}-[A-HJ-NP-Z2-9]{5}$/.test(key)) return setFeedback("Use a serial in the format LVBRPM-XXXXX-XXXXX-XXXXX.");
+    const key = String(input?.value || "").trim().toUpperCase();
+    if (key.length < 16 || key.length > 100) return setFeedback("Enter the Happy Little license key.");
     button.disabled = true;
-    await chrome.storage.local.set({ lovarpmLicenseCustomerName:customer });
-    setFeedback("Validating license with Supabase…", "warning");
+    setFeedback("Activating with Happy Little…", "warning");
     try {
-      const response = await chrome.runtime.sendMessage({ type:"LOVARPM_LICENSE_ACTIVATE", key, customer });
-      if (response?.status?.valid) { setFeedback("License activated successfully.", "success"); setTimeout(() => showUnlocked(response.status), 250); }
-      else showLocked(response?.status || { message:response?.error || "Could not activate the license." });
-    } catch { setFeedback("Could not connect to the license server."); }
+      const response = await chrome.runtime.sendMessage({ type:"LOVARPM_LICENSE_ACTIVATE", key });
+      const status = response?.status || { valid:false, code:"provider_error", message:"Could not activate the license." };
+      showStatus(status);
+      if (status.valid) setFeedback("License activated.", "success");
+    } catch { showStatus({ valid:false, code:"provider_error", message:"Could not connect to Happy Little. Protected features remain locked." }); }
     finally { button.disabled = false; }
   });
 
   resetButton?.addEventListener("click", async () => {
-    const key = String(input?.value || "").replace(/\s+/g, "").toUpperCase();
-    const customer = String(customerNameInput?.value || "").normalize("NFKC").replace(/\s+/g, " ").trim();
-    if (!customer) return setFeedback("Enter the customer's name to reset activation.");
-    if (!/^LVBRPM-[A-HJ-NP-Z2-9]{5}-[A-HJ-NP-Z2-9]{5}-[A-HJ-NP-Z2-9]{5}$/.test(key)) return setFeedback("Use a serial in the format LVBRPM-XXXXX-XXXXX-XXXXX.");
+    if (!lastStatus?.valid || !window.confirm("Deactivate this device? LovaRPM protected features will lock on this device.")) return;
     resetButton.disabled = true;
-    if (button) button.disabled = true;
-    await chrome.storage.local.set({ lovarpmLicenseCustomerName:customer });
-    setFeedback("Resetting activation and transferring it to this computer…", "warning");
+    setFeedback("Deactivating this device…", "warning");
     try {
-      const response = await chrome.runtime.sendMessage({ type:"LOVARPM_LICENSE_RESET", key, customer });
-      if (response?.status?.valid) {
-        const remaining = Number.isInteger(response.status.resetsRemaining) ? response.status.resetsRemaining : null;
-        const suffix = remaining === null ? "" : ` Restam ${remaining} reset${remaining === 1 ? "" : "s"} nesta janela de 24 horas.`;
-        setFeedback(`Activation reset. This computer is now active and the previous computer has been blocked.${suffix}`, "success");
-        setTimeout(() => showUnlocked(response.status), 650);
-      } else {
-        const status = response?.status || { message:response?.error || "Could not reset activation." };
-        if (status?.code === "reset_limit" && status?.retryAt) {
-          const retry = new Date(status.retryAt);
-          if (!Number.isNaN(retry.getTime())) status.message = `The limit of 2 resets in 24 hours has been reached. Try again after ${retry.toLocaleString("en-US")}.`;
-        }
-        showLocked(status);
-      }
-    } catch { setFeedback("Could not connect to the license server."); }
-    finally {
-      resetButton.disabled = false;
-      if (button) button.disabled = false;
-    }
+      const response = await chrome.runtime.sendMessage({ type:"LOVARPM_LICENSE_DEACTIVATE" });
+      showStatus(response?.status || { valid:false, code:"provider_error", message:"Could not deactivate this device." });
+    } catch { showStatus({ valid:false, code:"provider_error", message:"Could not connect to Happy Little. The current license state could not be changed." }); }
+    finally { resetButton.disabled = false; }
   });
 
-  chrome.storage.local.get(["lovarpmLicenseCustomerName","lovarpmLicenseSerial"]).then((stored) => {
-    if (customerNameInput && stored.lovarpmLicenseCustomerName) customerNameInput.value = stored.lovarpmLicenseCustomerName;
-    if (input && stored.lovarpmLicenseSerial) input.value = stored.lovarpmLicenseSerial;
+  chrome.storage.local.get("happyLittleLicenseKey").then((stored) => {
+    if (input && stored.happyLittleLicenseKey) input.value = stored.happyLittleLicenseKey;
   });
-
-  // immediate unlock (no flash of gate)
-  if (gate) { gate.hidden = true; gate.style.display = "none"; }
-  if (shell) shell.dataset.licenseLocked = "false";
 
   loadStatus(true);
 })();

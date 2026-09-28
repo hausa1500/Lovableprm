@@ -464,6 +464,13 @@
         if (!tab?.id) throw new Error(`Open the ${platformName} dashboard before sending the prompt.`);
         await chrome.tabs.update(tab.id, { active: true });
         await waitForTabComplete(tab.id);
+        const authorization = await chrome.runtime.sendMessage({ type: "LOVARPM_LICENSE_AUTHORIZE" });
+        const remainingMs = Number(authorization?.remainingMs);
+        if (!authorization?.ok || !authorization.status?.valid || !Number.isFinite(remainingMs) || remainingMs <= 250) {
+          throw new Error(authorization?.status?.message || "A valid LovaRPM license is required.");
+        }
+        const authorizationDeadline = performance.now() + remainingMs;
+        if (performance.now() + 250 >= authorizationDeadline) throw new Error("The license expired before the prompt could be prepared.");
         const injected = await chrome.scripting.executeScript({ target: { tabId: tab.id }, args: [prepared.prompt], func: (prompt) => {
           const selectors = ["textarea", "[contenteditable='true']", "[role='textbox']"];
           const input = selectors.map((selector) => [...document.querySelectorAll(selector)]).flat().find((element) => {
