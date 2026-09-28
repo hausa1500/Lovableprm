@@ -173,6 +173,7 @@ async function sendPromptMessage(tabId, prompt) {
   return chrome.tabs.sendMessage(tabId, {
     type: "LOVABURST_SUBMIT_TO_CHATGPT",
     prompt,
+    implementationTask: true,
   });
 }
 

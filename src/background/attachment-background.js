@@ -168,6 +168,7 @@ async function submit(message, sender) {
     const dispatched = await chrome.tabs.sendMessage(tab.id, {
       type: "LOVABURST_SUBMIT_TO_CHATGPT",
       prompt,
+      implementationTask: true,
     });
     if (!dispatched?.ok) {
       throw new Error(dispatched?.error || "O ChatGPT não confirmou o envio da mensagem.");
