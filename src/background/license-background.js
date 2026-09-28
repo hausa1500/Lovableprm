@@ -2,7 +2,6 @@ const API_URL = "https://happy-little101.lovable.app/api/public/v1/licenses";
 const PRODUCT_IDENTIFIER = "browser-extension-core";
 const LICENSE_KEY = "happyLittleLicenseKey";
 const DEVICE_ID_KEY = "happyLittleDeviceId";
-const STATUS_KEY = "happyLittleLicenseStatus";
 const inFlightChecks = new Map();
 let deviceIdPromise = null;
 const LEGACY_KEYS = [
@@ -12,6 +11,7 @@ const LEGACY_KEYS = [
   "lovarpmInstallationId",
   "lovaburstInstallationId",
   "lovarpmLicenseCustomerName",
+  "happyLittleLicenseStatus",
 ];
 
 const STATUS_MESSAGES = {
@@ -36,11 +36,6 @@ function statusRecord(code, details = {}) {
     checkedAt: Date.now(),
     ...details,
   };
-}
-
-async function saveStatus(status) {
-  await chrome.storage.local.set({ [STATUS_KEY]: status });
-  return status;
 }
 
 function statusFromResult(result) {
@@ -159,40 +154,40 @@ async function providerOperation(operation, licenseKey) {
 async function getLicenseStatus() {
   const stored = await chrome.storage.local.get(LICENSE_KEY);
   const key = typeof stored[LICENSE_KEY] === "string" ? stored[LICENSE_KEY] : "";
-  if (!key) return saveStatus(statusRecord("unlicensed"));
+  if (!key) return statusRecord("unlicensed");
   const result = await providerOperation("check", key);
-  return saveStatus(statusFromResult(result));
+  return statusFromResult(result);
 }
 
 async function activateLicense(rawKey) {
   const licenseKey = String(rawKey || "").trim().toUpperCase();
   if (!licenseKey || licenseKey.length < 16 || licenseKey.length > 100) {
-    return saveStatus(statusRecord("invalid"));
+    return statusRecord("invalid");
   }
 
   await chrome.storage.local.remove(LICENSE_KEY);
   const result = await providerOperation("activate", licenseKey);
   if (result.status.valid) await chrome.storage.local.set({ [LICENSE_KEY]: licenseKey });
-  return saveStatus(statusFromResult(result));
+  return statusFromResult(result);
 }
 
 async function deactivateLicense() {
   const stored = await chrome.storage.local.get(LICENSE_KEY);
   const key = typeof stored[LICENSE_KEY] === "string" ? stored[LICENSE_KEY] : "";
-  if (!key) return saveStatus(statusRecord("unlicensed"));
+  if (!key) return statusRecord("unlicensed");
   const result = await providerOperation("deactivate", key);
-  return saveStatus(result.status.code === "deactivated" ? statusRecord("deactivated") : result.status);
+  return result.status.code === "deactivated" ? statusRecord("deactivated") : result.status;
 }
 
 async function authorizeOperation() {
   const stored = await chrome.storage.local.get(LICENSE_KEY);
   const key = typeof stored[LICENSE_KEY] === "string" ? stored[LICENSE_KEY] : "";
   if (!key) {
-    const status = await saveStatus(statusRecord("unlicensed"));
+    const status = statusRecord("unlicensed");
     return { ok: false, status };
   }
   const result = await providerOperation("check", key);
-  const status = await saveStatus(statusFromResult(result));
+  const status = statusFromResult(result);
   return status.valid ? { ok: true, status, remainingMs: result.remainingMs } : { ok: false, status };
 }
 
@@ -211,17 +206,14 @@ globalThis.LovaRPMLicense = {
 };
 
 chrome.storage.local.remove(LEGACY_KEYS).catch(() => {});
-chrome.runtime.onInstalled.addListener(() => { getLicenseStatus().catch(() => {}); });
-chrome.runtime.onStartup?.addListener?.(() => { getLicenseStatus().catch(() => {}); });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (!message || typeof message.type !== "string") return false;
   const type = message.type;
   const reply = (promise) => promise
     .then((status) => sendResponse({ ok: true, status }))
-    .catch(async () => {
+    .catch(() => {
       const status = statusRecord("provider_error");
-      await saveStatus(status).catch(() => {});
       sendResponse({ ok: false, status });
     });
 
@@ -238,9 +230,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
   if (type === "LOVARPM_LICENSE_AUTHORIZE") {
-    authorizeOperation().then(sendResponse).catch(async () => {
+    authorizeOperation().then(sendResponse).catch(() => {
       const status = statusRecord("provider_error");
-      await saveStatus(status).catch(() => {});
       sendResponse({ ok: false, status });
     });
     return true;

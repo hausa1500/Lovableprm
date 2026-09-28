@@ -52,7 +52,6 @@
         "src/content/lovable-composer-core.js",
         "src/content/lovable-attachments.js",
         "src/content/lovable-composer.js",
-        "src/content/lovable-license-guard.js",
         "src/content/lovable-run-monitor.js"
       ],
       "run_at": "document_idle"
@@ -86,7 +85,6 @@
         "src/content/lovable-integrations.js",
         "src/content/lovable-supabase-state-bridge.js",
         "src/content/lovable-composer.js",
-        "src/content/lovable-license-guard.js",
         "src/content/lovable-run-monitor.js",
         "src/content/lovable-logo-refresh.js",
         "src/content/lovable-preview-refresh.js"

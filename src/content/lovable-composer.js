@@ -49,7 +49,7 @@
     const active = core.active(), mode = shadow.querySelector(".lb-mode"), boostButton = shadow.querySelector(".lb-boost");
     const platformName = core.state.platform === "base44" ? "Base44" : "Lovable";
     mode.dataset.on = String(active); mode.querySelector(".lb-label").textContent = active ? "LovaRPM" : platformName;
-    mode.title = active ? "LovaRPM is active — your requests are sent through ChatGPT." : `Direct ${platformName} mode — your requests will be sent directly to ${platformName}.`;
+    mode.title = active ? "LovaRPM mode is enabled. License and ChatGPT connection are checked when sending." : `Direct ${platformName} mode — your requests will be sent directly to ${platformName}.`;
     controls.dataset.active = String(active);
     boostButton.disabled = !core.state.projectId || !core.state.globalEnabled || busy || enhancing;
   }
