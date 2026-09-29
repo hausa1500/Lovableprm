@@ -1,5 +1,5 @@
 import { getConfig, setConfig } from "../shared/storage.js";
-import { getPromptSkillIds, withSkillInstructions } from "../shared/skill-instructions.js";
+import { getPromptSkillIds, withPrmV5ImplementationContext, withSkillInstructions } from "../shared/skill-instructions.js";
 
 const CHATGPT_URL_PATTERNS = ["https://chatgpt.com/*"];
 const CHATGPT_BRIDGE_FILE = "src/content/chatgpt.js";
@@ -376,7 +376,8 @@ async function relayPromptToChatGpt(payload, sourceTabId = null) {
 
   const preparedPrompt = await globalThis.LovaRPMLicense?.preparePrompt?.("main", payload);
   if (!preparedPrompt) throw new Error("The server did not prepare the operation.");
-  const prompt = withSkillInstructions(preparedPrompt, payload.skills);
+  const implementationPrompt = await withPrmV5ImplementationContext(preparedPrompt, payload);
+  const prompt = withSkillInstructions(implementationPrompt, payload.skills);
   let sourceTab = null;
   let activatedChatForDispatch = false;
 

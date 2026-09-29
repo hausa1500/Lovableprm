@@ -196,3 +196,56 @@ export function withSkillInstructions(prompt, selectedSkills) {
   const guidance = selected.map(({ name, instruction }) => `- ${name}: ${instruction}`).join("\n");
   return `${prompt}\n\n[LovaRPM selected Skill guidance]\nApply all compatible guidance below as supplemental direction. The user's original task and explicit constraints remain primary. Do not replace, truncate, duplicate, or broaden the task. If guidance conflicts, honor the user's explicit request and apply only relevant guidance.\n${guidance}`;
 }
+
+export async function withPrmV5ImplementationContext(userRequest, context = {}) {
+  if (typeof userRequest !== "string") return userRequest;
+
+  let stored = {};
+  try {
+    stored = await chrome.storage.local.get(["config", "projectIntegrations", "projectChatBindings"]);
+  } catch {}
+
+  const projectId = String(context.lovableProjectId || context.projectId || "").trim();
+  const bindings = stored.projectChatBindings || {};
+  const projectRecord = projectId ? bindings[projectId] || {} : {};
+  const integration = projectId ? stored.projectIntegrations?.[projectId] || {} : {};
+  const cleanField = (value) => String(value || "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
+  const branch = cleanField(context.branch || stored.config?.branch);
+  const skills = normalizeSkillIds(context.skills);
+  const editorUrl = cleanField(context.editorUrl || context.url || projectRecord.sourceUrl);
+  const projectName = cleanField(context.projectName || context.title || projectRecord.sourceTitle);
+  const repository = cleanField(context.repository || projectRecord.repository);
+  const supabaseProjectId = cleanField(
+    integration.supabase?.projectRef || projectRecord.integrationContext?.supabaseProjectRef,
+  );
+  const platform = context.platform === "base44" ? "BASE44" : "LOVABLE";
+  const requestId = cleanField(context.requestId) || `prm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const metadata = [
+    "[PRM_BUILD_REQUEST_V5]",
+    `REQUEST_ID: ${requestId}`,
+    "MODE: IMPLEMENTATION",
+    "WRITER: CHATGPT_CONNECTED_GITHUB",
+    "EXECUTION_STRATEGY: INSPECT -> PLAN -> IMPLEMENT -> VERIFY -> REPAIR -> FINALIZE",
+    "PROJECT_CONTEXT:",
+    `PROJECT: ${projectName || "AUTO_NOT_DETECTED"}`,
+    `REPOSITORY: ${repository || "AUTO_NOT_DETECTED"}`,
+    `BRANCH_MODE: ${branch ? "EXPLICIT" : "AUTO_DETECT_DEFAULT"}`,
+    `BRANCH: ${branch || "AUTO"}`,
+    `SUPABASE_PROJECT_ID: ${supabaseProjectId}`,
+    `PLATFORM: ${platform}`,
+    `LOVABLE_PROJECT: ${projectId || "AUTO_NOT_DETECTED"}`,
+    `LOVABLE_EDITOR_URL: ${editorUrl || "AUTO_NOT_DETECTED"}`,
+    "LOVABLE_POLICY: PREVIEW_ONLY; DO_NOT_SEND_PROMPT_TO_LOVABLE",
+    `SKILLS_SELECTED: ${skills.length ? skills.join(", ") : "NONE"}`,
+    "IMPLEMENTATION_CONTEXT:",
+    "TASK_MODE: MODIFY_EXISTING_PROJECT",
+    "TARGET: EXISTING_PROJECT_IMPLEMENTATION",
+    "Modify the specified existing project. Do not substitute another repository or turn an implementation request into a detached concept, mockup, or image-generation task unless the user explicitly requests that. Preserve explicitly requested image or media generation behavior.",
+    "Treat the REPOSITORY field as the intended codebase. If it is AUTO_NOT_DETECTED, do not guess or substitute a repository or claim access; use only an explicitly linked project target and state when the target cannot be resolved.",
+    "",
+    "USER_REQUEST:",
+    userRequest,
+  ];
+
+  return metadata.join("\n");
+}
