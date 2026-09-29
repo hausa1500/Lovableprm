@@ -165,7 +165,6 @@ async function activateLicense(rawKey) {
     return statusRecord("invalid");
   }
 
-  await chrome.storage.local.remove(LICENSE_KEY);
   const result = await providerOperation("activate", licenseKey);
   if (result.status.valid) await chrome.storage.local.set({ [LICENSE_KEY]: licenseKey });
   return statusFromResult(result);

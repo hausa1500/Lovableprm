@@ -1,4 +1,3 @@
-import "./runtime-integrity.js";
 import "./license-background.js";
 import "./chatgpt-visibility.js";
 import "./update-refresh.js";
