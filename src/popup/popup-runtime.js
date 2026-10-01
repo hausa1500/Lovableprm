@@ -1,18 +1,40 @@
 "use strict";
 
+function isProviderNewUrl(provider, url) {
+  const config = globalThis.LovaRPMProviders?.[provider] || globalThis.LovaRPMProviders?.chatgpt;
+  try {
+    const parsed = new URL(url);
+    return parsed.origin === config.origin && (parsed.pathname === "/" || parsed.pathname === "/new");
+  } catch {
+    return false;
+  }
+}
+
 async function resolveTab(conversation) {
   if (!conversation) return null;
-  const lockedUrl = String(conversation.lockedUrl || conversation.url || "").trim();
+  const provider = conversation.aiProvider || "chatgpt";
+  const config = globalThis.LovaRPMProviders?.[provider] || globalThis.LovaRPMProviders?.chatgpt;
+  const lockedUrl = String(conversation.lockedUrl || (!conversation.pendingNavigation ? conversation.url : "") || "").trim();
 
   if (conversation.tabId) {
     try {
       const tab = await chrome.tabs.get(conversation.tabId);
-      if (tab?.url?.startsWith("https://chatgpt.com/") && (!lockedUrl || tab.url === lockedUrl)) return tab;
+      if (tab?.url?.startsWith(`${config.origin}/`) && (!lockedUrl || tab.url === lockedUrl || conversation.pendingNavigation)) {
+        if (conversation.pendingNavigation && !isProviderNewUrl(provider, tab.url)) {
+          await update(workspace.lovableProjectId, (rec) => ({
+            ...rec,
+            conversations: rec.conversations.map((item) => item.id === conversation.id
+              ? { ...item, url: tab.url, title: tab.title || item.title, lockedUrl: tab.url, lockedTitle: tab.title || item.lockedTitle, pendingNavigation: false }
+              : item),
+          }));
+        }
+        return tab;
+      }
     } catch {}
   }
 
-  const tabs = await chatTabs();
-  if (lockedUrl && lockedUrl !== "https://chatgpt.com/") {
+  const tabs = await chrome.tabs.query({ url: config.patterns });
+  if (lockedUrl && !isProviderNewUrl(provider, lockedUrl)) {
     const byUrl = tabs.find((tab) => tab.url === lockedUrl);
     if (byUrl?.tabId) return chrome.tabs.get(byUrl.tabId);
   }
@@ -20,17 +42,17 @@ async function resolveTab(conversation) {
   return null;
 }
 
-async function collectHandoffFromActiveConversation() {
+async function collectHandoffFromActiveConversation(provider = aiProvider) {
   const projectId = workspace.lovableProjectId;
   const rec = await record(projectId);
-  const conversation = active(rec);
+  const conversation = active(rec, provider);
   if (!projectId || !conversation) return "";
 
   const tab = await resolveTab(conversation);
   if (!tab?.id) return "";
 
   try {
-    if (!(await ensureBridge(tab.id))) return "";
+    if (!(await ensureBridge(tab.id, provider))) return "";
     const response = await chrome.tabs.sendMessage(tab.id, {
       type: "LOVABURST_EXPORT_PROJECT_CONTEXT",
       projectId,
@@ -50,16 +72,16 @@ async function collectHandoffFromActiveConversation() {
   }
 }
 
-async function sendContext() {
+async function sendContext(provider = aiProvider) {
   const projectId = workspace.lovableProjectId;
   const rec = await record(projectId);
-  const conversation = active(rec);
-  if (!rec || !conversation) throw new Error("No active conversation is linked to this project.");
+  const conversation = active(rec, provider);
+  if (!rec || !conversation) throw new Error(`No active ${providerName(provider)} conversation is linked to this project.`);
   const tab = await resolveTab(conversation);
   if (!tab?.id) throw new Error("The active conversation is not open.");
 
-  await activateRelay(tab.id);
-  await sendDirect(tab.id, await contextPrompt(rec));
+  await activateRelay(tab.id, provider);
+  await sendDirect(tab.id, await contextPrompt(rec, provider), provider);
   await update(projectId, (next) => ({
     ...next,
     conversations: next.conversations.map((item) =>
@@ -69,8 +91,9 @@ async function sendContext() {
             tabId: tab.id,
             url: tab.url || item.url,
             title: tab.title || item.title,
-            lockedUrl: tab.url || item.lockedUrl || item.url,
+            lockedUrl: item.pendingNavigation ? "" : (tab.url || item.lockedUrl || item.url),
             lockedTitle: tab.title || item.lockedTitle || item.title,
+            pendingNavigation: item.pendingNavigation || false,
             contextSentAt: now(),
           }
         : item
@@ -78,12 +101,13 @@ async function sendContext() {
   }));
 }
 
-async function waitChat(tabId, timeout = 20000) {
+async function waitChat(tabId, provider = aiProvider, timeout = 20000) {
+  const config = globalThis.LovaRPMProviders?.[provider] || globalThis.LovaRPMProviders?.chatgpt;
   const started = Date.now();
   while (Date.now() - started < timeout) {
     try {
       const tab = await chrome.tabs.get(tabId);
-      if (tab?.url?.startsWith("https://chatgpt.com/") && tab.status === "complete") return tab;
+      if (tab?.url?.startsWith(`${config.origin}/`) && tab.status === "complete") return tab;
     } catch {
       return null;
     }
@@ -92,12 +116,25 @@ async function waitChat(tabId, timeout = 20000) {
   return chrome.tabs.get(tabId).catch(() => null);
 }
 
+async function openProviderWithPrompt(prompt, provider = aiProvider) {
+  const config = providerConfig(provider);
+  const tab = await chrome.tabs.create({ url: config.newUrl, active: provider === "claude" });
+  const loaded = await waitChat(tab.id, provider);
+  if (!loaded?.id) throw new Error(`The new ${config.name} conversation did not load.`);
+  await chrome.tabs.update(loaded.id, { active: true });
+  await activateRelay(loaded.id, provider);
+  await sendDirect(loaded.id, prompt, provider);
+  return loaded;
+}
+
 async function newConversation(options = {}) {
+  const provider = options.provider === "claude" || options.provider === "chatgpt" ? options.provider : aiProvider;
+  const config = providerConfig(provider);
   const projectId = workspace.lovableProjectId;
   if (!projectId) throw new Error(`Open a ${workspace.platform === "base44" ? "Base44" : "Lovable"} project first.`);
   const initialPrompt = String(options.initialPrompt || "").trim();
 
-  if (!initialPrompt) await collectHandoffFromActiveConversation();
+  if (!initialPrompt) await collectHandoffFromActiveConversation(provider);
 
   await update(projectId, (rec) => ({
     ...rec,
@@ -107,27 +144,29 @@ async function newConversation(options = {}) {
     sourceUrl: workspace.sourceUrl || rec.sourceUrl || "",
   }));
 
-  const tab = await chrome.tabs.create({ url: "https://chatgpt.com/", active: false });
+  const tab = await chrome.tabs.create({ url: config.newUrl, active: provider === "claude" });
   const conversation = {
     id: makeId(),
+    aiProvider: provider,
     tabId: tab.id,
-    url: tab.url || "https://chatgpt.com/",
-    title: "Nova conversa · ChatGPT",
+    url: tab.url || config.newUrl,
+    title: `New conversation · ${config.name}`,
     createdAt: now(),
     linkedAt: now(),
     contextSentAt: "",
     lockedUrl: "",
-    lockedTitle: "Nova conversa · ChatGPT",
+    lockedTitle: `New conversation · ${config.name}`,
+    pendingNavigation: true,
   };
 
   await update(projectId, (rec) => ({
-    ...rec,
+    ...setProviderConversation(rec, conversation, provider),
     activeConversationId: conversation.id,
     conversations: [...rec.conversations, conversation].slice(-12),
   }));
 
-  const loaded = await waitChat(tab.id);
-  if (!loaded?.id) throw new Error("The new ChatGPT conversation did not load.");
+  const loaded = await waitChat(tab.id, provider);
+  if (!loaded?.id) throw new Error(`The new ${config.name} conversation did not load.`);
 
   await update(projectId, (rec) => ({
     ...rec,
@@ -138,16 +177,17 @@ async function newConversation(options = {}) {
             tabId: loaded.id,
             url: loaded.url || item.url,
             title: loaded.title || item.title,
-            lockedUrl: loaded.url && loaded.url !== "https://chatgpt.com/" ? loaded.url : item.lockedUrl,
+            lockedUrl: isProviderNewUrl(provider, loaded.url) ? "" : loaded.url || item.lockedUrl,
+            pendingNavigation: isProviderNewUrl(provider, loaded.url),
             lockedTitle: loaded.title || item.lockedTitle || item.title,
           }
         : item
     ),
   }));
 
-  await activateRelay(loaded.id);
-  if (initialPrompt) await sendDirect(loaded.id, initialPrompt);
-  else await sendContext();
+  await activateRelay(loaded.id, provider);
+  if (initialPrompt) await sendDirect(loaded.id, initialPrompt, provider);
+  else await sendContext(provider);
 }
 
 async function rememberLastWorkspace(nextWorkspace) {
@@ -295,7 +335,7 @@ async function restoreActiveConversation(rec) {
   if (!tab?.id) return rec;
 
   try {
-    await activateRelay(tab.id);
+    await activateRelay(tab.id, conversation.aiProvider || aiProvider);
   } catch {}
   return rec;
 }

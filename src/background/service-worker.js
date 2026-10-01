@@ -16,7 +16,7 @@ async function configureSidePanel() {
 
 async function cleanChatGptOnlyState() {
   const config = await getConfig();
-  const migration = await chrome.storage.local.get(["repositoryDetectionMigrationV0400", "projectChatBindings", "chatgptOnlyCleanupV261"]);
+  const migration = await chrome.storage.local.get(["repositoryDetectionMigrationV0400", "projectChatBindings", "chatgptOnlyCleanupV261", "providerConversationMigrationV1"]);
   const legacyProviderKey = ["ai", "Provider"].join("");
   const removedAssistantName = String.fromCharCode(103, 101, 109, 105, 110, 105);
   const legacySecondaryEnabledKey = removedAssistantName + "Enabled";
@@ -31,7 +31,7 @@ async function cleanChatGptOnlyState() {
   }
 
   if (!migration.chatgptOnlyCleanupV261) {
-    const bindings = migration.projectChatBindings || {};
+    const bindings = patch.projectChatBindings || migration.projectChatBindings || {};
     const cleaned = {};
     for (const [projectId, record] of Object.entries(bindings)) {
       const conversations = (Array.isArray(record?.conversations) ? record.conversations : [])
@@ -45,6 +45,23 @@ async function cleanChatGptOnlyState() {
     patch.projectRunStatuses = {};
     patch.chatgptOnlyCleanupV261 = true;
     await chrome.storage.local.remove(["aiLink", "pendingPrompt", removedAssistantName + "LovableRelays"]);
+  }
+
+  if (!migration.providerConversationMigrationV1) {
+    const bindings = patch.projectChatBindings || migration.projectChatBindings || {};
+    const migrated = {};
+    for (const [projectId, record] of Object.entries(bindings)) {
+      const conversations = (Array.isArray(record?.conversations) ? record.conversations : []).map((item) => {
+        if (item.aiProvider) return item;
+        const isUnresolvedNewChat = !item.lockedUrl && String(item.url || "") === "https://chatgpt.com/";
+        return { ...item, aiProvider: "chatgpt", ...(isUnresolvedNewChat ? { pendingNavigation: true } : {}) };
+      });
+      const activeConversationIds = { ...(record?.activeConversationIds || {}) };
+      if (record?.activeConversationId) activeConversationIds.chatgpt = record.activeConversationId;
+      migrated[projectId] = { ...record, activeConversationIds, conversations };
+    }
+    patch.projectChatBindings = migrated;
+    patch.providerConversationMigrationV1 = true;
   }
 
   await chrome.storage.local.set(patch);
@@ -169,9 +186,11 @@ async function getChatGptStatus() {
   };
 }
 
-async function sendPromptMessage(tabId, prompt) {
+async function sendPromptMessage(tabId, prompt, provider = "chatgpt") {
+  const config = globalThis.LovaRPMProviders?.[provider];
+  if (!config) throw new Error("Unsupported AI provider.");
   return chrome.tabs.sendMessage(tabId, {
-    type: "LOVABURST_SUBMIT_TO_CHATGPT",
+    type: config.submitMessage,
     prompt,
     implementationTask: true,
   });
@@ -192,6 +211,73 @@ async function ensureChatGptBridge(tabId) {
   return Boolean(ping?.ok && ping.source === "chatgpt");
 }
 
+async function ensureProviderBridge(tabId, provider) {
+  if (provider === "chatgpt") return ensureChatGptBridge(tabId);
+  const config = globalThis.LovaRPMProviders?.[provider];
+  if (!config) return false;
+  try {
+    const ping = await chrome.tabs.sendMessage(tabId, { type: "LOVABURST_CONTENT_PING" });
+    if (ping?.ok && ping.source === config.pingSource) return true;
+  } catch {}
+  await chrome.scripting.executeScript({ target: { tabId }, files: [config.bridgeFile] });
+  const ping = await chrome.tabs.sendMessage(tabId, { type: "LOVABURST_CONTENT_PING" });
+  return Boolean(ping?.ok && ping.source === config.pingSource);
+}
+
+async function linkClaudeTab(tabId) {
+  if (!Number.isInteger(tabId)) throw new Error("Invalid Claude tab.");
+  const tab = await chrome.tabs.get(tabId);
+  if (!tab?.id || !tab.url?.startsWith("https://claude.ai/")) throw new Error("The selected tab is not a Claude conversation.");
+  if (!(await ensureProviderBridge(tab.id, "claude"))) throw new Error("The LovaRPM bridge did not respond in this Claude tab.");
+  return { tabId: tab.id, url: tab.url || "https://claude.ai/new", title: tab.title || "Claude", linkedAt: new Date().toISOString() };
+}
+
+async function linkProviderTab(tabId, provider) {
+  if (provider === "chatgpt") return linkChatGptTab(tabId);
+  if (provider === "claude") return linkClaudeTab(tabId);
+  throw new Error("Unsupported AI provider.");
+}
+
+function isProviderNewUrl(provider, url) {
+  const config = globalThis.LovaRPMProviders?.[provider];
+  try {
+    const parsed = new URL(url);
+    return parsed.origin === config?.origin && (parsed.pathname === "/" || parsed.pathname === "/new");
+  } catch {
+    return false;
+  }
+}
+
+async function resolveProjectProviderTab(projectId, provider) {
+  if (!projectId || !globalThis.LovaRPMProviders?.[provider]) return null;
+  const stored = await chrome.storage.local.get("projectChatBindings");
+  const record = stored.projectChatBindings?.[projectId];
+  const conversationId = record?.activeConversationIds?.[provider] || record?.activeConversationId;
+  const conversation = record?.conversations?.find((item) => item.id === conversationId) || null;
+  if (!conversation || (conversation.aiProvider || "chatgpt") !== provider) return null;
+  const config = globalThis.LovaRPMProviders[provider];
+  const expectedUrl = String(conversation.lockedUrl || (!conversation.pendingNavigation ? conversation.url : "") || "").trim();
+  if (conversation.tabId) {
+    try {
+      const tab = await chrome.tabs.get(conversation.tabId);
+      if (tab?.url?.startsWith(`${config.origin}/`) && (!expectedUrl || tab.url === expectedUrl || conversation.pendingNavigation)) return tab;
+    } catch {}
+  }
+  if (expectedUrl && !isProviderNewUrl(provider, expectedUrl)) {
+    const [tab] = await chrome.tabs.query({ url: [expectedUrl] });
+    if (tab?.id && tab.url?.startsWith(`${config.origin}/`)) return tab;
+  }
+  return null;
+}
+
+async function refreshProviderResult(projectId, provider) {
+  const tab = await resolveProjectProviderTab(projectId, provider);
+  if (!tab?.id) throw new Error(`The linked ${globalThis.LovaRPMProviders?.[provider]?.name || "AI provider"} conversation is unavailable.`);
+  await ensureProviderBridge(tab.id, provider);
+  const result = await chrome.tabs.sendMessage(tab.id, { type: "LOVABURST_SCAN_RESULT_MARKERS", projectId });
+  return result || { ok: true, projectId, aiProvider: provider };
+}
+
 function mainWorldWorkspaceProbe() {
   const blocked = new Set([
     "settings", "marketplace", "features", "topics", "collections", "login", "signup",
@@ -199,7 +285,6 @@ function mainWorldWorkspaceProbe() {
     "en", "docs",
   ]);
   const scored = new Map();
-
   const normalizePlainRepository = (value) => {
     const text = String(value || "").trim();
     const match = text.match(/^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?$/);
@@ -363,15 +448,18 @@ async function detectLovableWorkspace(tabId, payload = {}) {
 
 const sleepBackground = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function relayPromptToChatGpt(payload, sourceTabId = null) {
+async function relayPromptToProvider(payload, sourceTabId = null) {
+  const provider = payload.aiProvider === "claude" ? "claude" : "chatgpt";
+  const providerInfo = globalThis.LovaRPMProviders?.[provider];
+  if (!providerInfo) throw new Error("Unsupported AI provider.");
   const config = await getConfig();
-  if (config.enabled === false || config.chatgptEnabled === false) {
-    throw new Error("The ChatGPT integration is disabled in LovaRPM.");
+  if (config.enabled === false || config[providerInfo.enabledConfigKey] === false) {
+    throw new Error(`The ${providerInfo.name} integration is disabled in LovaRPM.`);
   }
 
-  const tab = await getLinkedChatGptTab();
+  const tab = await resolveProjectProviderTab(payload.lovableProjectId, provider);
   if (!tab?.id) {
-    throw new Error("ChatGPT is not linked. Open the LovaRPM panel and link a ChatGPT conversation.");
+    throw new Error(`${providerInfo.name} is not linked to this project. Open the LovaRPM panel and link a ${providerInfo.name} conversation.`);
   }
 
   const preparedPrompt = await globalThis.LovaRPMLicense?.preparePrompt?.("main", payload);
@@ -386,27 +474,24 @@ async function relayPromptToChatGpt(payload, sourceTabId = null) {
       sourceTab = await chrome.tabs.get(sourceTabId).catch(() => null);
     }
 
-    // ChatGPT currently defers parts of its composer while a tab is backgrounded.
-    // Briefly make the linked chat the active tab so React processes the injected
-    // input/click immediately, then restore the Lovable tab after dispatch.
     if (!tab.active) {
       await chrome.tabs.update(tab.id, { active: true });
       activatedChatForDispatch = true;
       await sleepBackground(180);
     }
 
-    const bridgeReady = await ensureChatGptBridge(tab.id);
-    if (!bridgeReady) throw new Error("The ChatGPT bridge did not respond after injection.");
+    const bridgeReady = await ensureProviderBridge(tab.id, provider);
+    if (!bridgeReady) throw new Error(`The ${providerInfo.name} bridge did not respond after injection.`);
 
-    const response = await sendPromptMessage(tab.id, prompt);
+    const response = await sendPromptMessage(tab.id, prompt, provider);
     if (!response?.ok) {
-      throw new Error(response?.error || "ChatGPT did not confirm that the prompt was sent.");
+      throw new Error(response?.error || `${providerInfo.name} did not confirm that the prompt was sent.`);
     }
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     const failure = /license|protected features remain locked/i.test(detail)
       ? "LovaRPM license authorization failed"
-      : "Could not activate the LovaRPM bridge in ChatGPT";
+      : `Could not activate the LovaRPM bridge in ${providerInfo.name}`;
     throw new Error(`${failure}: ${detail}`);
   } finally {
     if (
@@ -419,19 +504,21 @@ async function relayPromptToChatGpt(payload, sourceTabId = null) {
     }
   }
 
-  return { tabId: tab.id };
+  return { tabId: tab.id, aiProvider: provider };
 }
 
 const PROJECT_RUN_STATUS_KEY = "projectRunStatuses";
 const ACCESS_BOOTSTRAP_KEY = "accessBootstrapConversationsV219";
 
-async function accessBootstrapState(projectId) {
+async function accessBootstrapState(projectId, provider = "chatgpt") {
   const id = String(projectId || "").trim();
   if (!id) return { required: false, key: "" };
   const stored = await chrome.storage.local.get(["projectChatBindings", ACCESS_BOOTSTRAP_KEY]);
   const record = stored.projectChatBindings?.[id];
-  const conversation = record?.conversations?.find((item) => item.id === record.activeConversationId) || null;
-  const identity = String(conversation?.id || record?.activeConversationId || conversation?.url || (conversation?.tabId ? `tab-${conversation.tabId}` : "")).trim();
+  const conversationId = record?.activeConversationIds?.[provider] || record?.activeConversationId;
+  const conversation = record?.conversations?.find((item) => item.id === conversationId) || null;
+  if (conversation && (conversation.aiProvider || "chatgpt") !== provider) return { required: true, key: "" };
+  const identity = String(conversation?.id || conversationId || conversation?.url || (conversation?.tabId ? `tab-${conversation.tabId}` : "")).trim();
   if (!identity) return { required: true, key: "" };
   const key = `${id}::${identity}`;
   return { required: !Boolean(stored[ACCESS_BOOTSTRAP_KEY]?.[key]), key };
@@ -480,7 +567,20 @@ async function handleCapturedPrompt(message, sender) {
   let repository = payload.repository || "";
   let repositoryDetectionSource = payload.repositoryDetectionSource || "";
   let lovableProjectId = payload.lovableProjectId || "";
+  const storedProvider = await chrome.storage.local.get("selectedAiProvider");
+  const aiProvider = payload.aiProvider === "claude" || payload.aiProvider === "chatgpt"
+    ? payload.aiProvider
+    : storedProvider.selectedAiProvider === "claude" ? "claude" : "chatgpt";
   const platform = payload.platform === "base44" || message.source === "base44" ? "base44" : "lovable";
+
+  const bindingStore = await chrome.storage.local.get("projectChatBindings");
+  const projectBinding = bindingStore.projectChatBindings?.[lovableProjectId];
+  const activeConversationId = projectBinding?.activeConversationIds?.[aiProvider] || projectBinding?.activeConversationId;
+  const activeConversation = projectBinding?.conversations?.find((item) => item.id === activeConversationId);
+  if (!activeConversation || (activeConversation.aiProvider || "chatgpt") !== aiProvider) {
+    const providerName = globalThis.LovaRPMProviders?.[aiProvider]?.name || "AI provider";
+    return { ok: false, error: `Connect a ${providerName} conversation to this project before sending.` };
+  }
 
   if (!repository) {
     const workspace = await detectLovableWorkspace(sender?.tab?.id, {
@@ -499,7 +599,7 @@ async function handleCapturedPrompt(message, sender) {
     fallbackSkills = stored.projectSkillSelections?.[lovableProjectId];
   }
 
-  const bootstrap = await accessBootstrapState(lovableProjectId);
+  const bootstrap = await accessBootstrapState(lovableProjectId, aiProvider);
 
   const pendingPrompt = {
     text: payload.text.trim(),
@@ -508,6 +608,7 @@ async function handleCapturedPrompt(message, sender) {
     capturedAt: payload.capturedAt || new Date().toISOString(),
     source: message.source || "lovable",
     platform,
+    aiProvider,
     repository,
     repositoryDetectionSource,
     lovableProjectId,
@@ -531,6 +632,7 @@ async function handleCapturedPrompt(message, sender) {
     error: "",
     excerpt: "",
     repository: pendingPrompt.repository || "",
+    aiProvider,
   });
 
   if (workspaceKey && pendingPrompt.repository) {
@@ -548,11 +650,12 @@ async function handleCapturedPrompt(message, sender) {
   await chrome.storage.local.set(storagePatch);
 
   try {
-    const relay = await relayPromptToChatGpt(pendingPrompt, sender?.tab?.id);
+    const relay = await relayPromptToProvider(pendingPrompt, sender?.tab?.id);
     const dispatchedPrompt = {
       ...pendingPrompt,
       status: "dispatched",
-      chatgptTabId: relay.tabId,
+      providerTabId: relay.tabId,
+      ...(aiProvider === "chatgpt" ? { chatgptTabId: relay.tabId } : {}),
       dispatchedAt: new Date().toISOString(),
     };
     await chrome.storage.local.set({ pendingPrompt: dispatchedPrompt });
@@ -560,13 +663,16 @@ async function handleCapturedPrompt(message, sender) {
       status: "working",
       marker: "",
       dispatchedAt: dispatchedPrompt.dispatchedAt,
-      chatgptTabId: relay.tabId,
+      providerTabId: relay.tabId,
+      ...(aiProvider === "chatgpt" ? { chatgptTabId: relay.tabId } : {}),
+      aiProvider,
       error: "",
     });
     return {
       ok: true,
       status: "dispatched",
-      chatgptTabId: relay.tabId,
+      providerTabId: relay.tabId,
+      aiProvider,
       repository: pendingPrompt.repository,
       repositoryDetectionSource: pendingPrompt.repositoryDetectionSource,
     };
@@ -593,18 +699,24 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
   if (link?.tabId === tabId) {
     await clearChatGptLink();
   }
+  const stored = await chrome.storage.local.get("projectChatBindings");
+  const bindings = stored.projectChatBindings || {};
+  let changed = false;
+  for (const record of Object.values(bindings)) {
+    record.conversations = (record.conversations || []).map((conversation) => {
+      if (conversation.tabId !== tabId) return conversation;
+      changed = true;
+      return { ...conversation, tabId: null, closedAt: new Date().toISOString() };
+    });
+  }
+  if (changed) await chrome.storage.local.set({ projectChatBindings: bindings });
 });
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   const link = await getStoredChatGptLink();
-  if (link?.tabId !== tabId) return;
-
-  if (changeInfo.url && !changeInfo.url.startsWith("https://chatgpt.com/")) {
+  if (link?.tabId === tabId && changeInfo.url && !changeInfo.url.startsWith("https://chatgpt.com/")) {
     await clearChatGptLink();
-    return;
-  }
-
-  if (tab?.url?.startsWith("https://chatgpt.com/") && (changeInfo.url || changeInfo.title)) {
+  } else if (link?.tabId === tabId && tab?.url?.startsWith("https://chatgpt.com/") && (changeInfo.url || changeInfo.title)) {
     await chrome.storage.local.set({
       chatgptLink: {
         ...link,
@@ -614,21 +726,44 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       },
     });
   }
+
+  if (!changeInfo.url || !tab?.url) return;
+  const storedBindings = await chrome.storage.local.get("projectChatBindings");
+  const bindings = storedBindings.projectChatBindings || {};
+  let changed = false;
+  for (const record of Object.values(bindings)) {
+    record.conversations = (record.conversations || []).map((conversation) => {
+      const provider = conversation.aiProvider || "chatgpt";
+      const providerInfo = globalThis.LovaRPMProviders?.[provider];
+      if (conversation.tabId !== tabId || !providerInfo) return conversation;
+      if (!tab.url.startsWith(`${providerInfo.origin}/`)) {
+        changed = true;
+        return { ...conversation, tabId: null, pendingNavigation: false, closedAt: new Date().toISOString() };
+      }
+      if (!conversation.pendingNavigation) return conversation;
+      const isNew = isProviderNewUrl(provider, tab.url);
+      if (isNew) return conversation;
+      changed = true;
+      return { ...conversation, url: tab.url, title: tab.title || conversation.title, lockedUrl: tab.url, lockedTitle: tab.title || conversation.lockedTitle, pendingNavigation: false };
+    });
+  }
+  if (changed) await chrome.storage.local.set({ projectChatBindings: bindings });
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "LOVABURST_RESULT_MARKER_DETECTED") {
-    // Step 3: the ChatGPT content script already persisted the project-scoped result.
-    // Mark access bootstrap complete only after a successful ChatGPT completion.
+    // Provider bridges persist project-scoped results; complete bootstrap only for its sender.
     const marker = String(message.marker || "");
     const projectId = String(message.projectId || "");
+    const provider = message.source === "claude" ? "claude" : "chatgpt";
     if (marker === "[LOVABURST_DONE]" || marker === "[LOVARPM_DONE]") {
       chrome.storage.local.get("pendingPrompt")
         .then((stored) => {
           const prompt = stored.pendingPrompt;
           if (
             prompt?.accessBootstrapKey &&
-            String(prompt?.lovableProjectId || "") === projectId
+            String(prompt?.lovableProjectId || "") === projectId &&
+            (prompt?.aiProvider || "chatgpt") === provider
           ) {
             return markAccessBootstrapComplete(prompt.accessBootstrapKey);
           }
@@ -683,6 +818,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "LOVABURST_LINK_PROVIDER") {
+    linkProviderTab(Number(message.tabId), message.provider === "claude" ? "claude" : "chatgpt")
+      .then((link) => sendResponse({ ok: true, link }))
+      .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+    return true;
+  }
+
   if (message.type === "LOVABURST_LINK_CHATGPT") {
     linkChatGptTab(Number(message.tabId))
       .then((link) => sendResponse({ ok: true, link }))
@@ -723,6 +865,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     handleCapturedPrompt(message, sender)
       .then(sendResponse)
       .catch((error) => sendResponse({ ok: false, error: String(error) }));
+    return true;
+  }
+
+  if (message.type === "LOVABURST_REFRESH_PROVIDER_RESULT") {
+    const provider = message.provider === "claude" ? "claude" : "chatgpt";
+    refreshProviderResult(String(message.projectId || ""), provider)
+      .then(sendResponse)
+      .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) }));
     return true;
   }
 

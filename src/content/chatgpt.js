@@ -334,6 +334,7 @@
     const stored = await chrome.storage.local.get(RUN_STATUS_STORAGE_KEY);
     const current = stored[RUN_STATUS_STORAGE_KEY] || {};
     const previous = current[result.projectId];
+    if (previous?.aiProvider && previous.aiProvider !== SOURCE) return;
 
     if (
       previous?.marker === result.marker &&
@@ -348,6 +349,7 @@
         [result.projectId]: {
           ...previous,
           projectId: result.projectId,
+          aiProvider: SOURCE,
           status: result.status,
           marker: result.marker,
           detectedAt: new Date().toISOString(),
@@ -548,6 +550,7 @@
     const stored = await chrome.storage.local.get(RUN_STATUS_STORAGE_KEY);
     const current = stored[RUN_STATUS_STORAGE_KEY] || {};
     const previous = current[projectId] || {};
+    if (previous.aiProvider && previous.aiProvider !== SOURCE) return;
     if (["done", "blocked", "error"].includes(previous.status) && !marker) return;
 
     await chrome.storage.local.set({
@@ -556,6 +559,7 @@
         [projectId]: {
           ...previous,
           projectId,
+          aiProvider: SOURCE,
           status: marker?.status || previous.status || "working",
           liveResponse,
           liveResponseAt: new Date().toISOString(),

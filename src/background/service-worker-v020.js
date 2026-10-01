@@ -1,3 +1,4 @@
+import "../shared/ai-providers.js";
 import "./license-background.js";
 import "./chatgpt-visibility.js";
 import "./update-refresh.js";

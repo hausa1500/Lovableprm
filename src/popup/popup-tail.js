@@ -5,7 +5,9 @@ function activeBuilderPattern() { return workspace.platform === "base44" ? "http
 function activeBuilderPrefix() { return workspace.platform === "base44" ? "https://app.base44.com/apps/" : "https://lovable.dev/"; }
 
 function displayConversationTitle(conversation, title) {
-  return !conversation?.lockedUrl && title === "Nova conversa · ChatGPT" ? "New conversation · ChatGPT" : title;
+  return !conversation?.lockedUrl && (conversation?.pendingNavigation || /New conversation|Nova conversa/i.test(title))
+    ? `New conversation · ${providerName(conversation?.aiProvider || aiProvider)}`
+    : title;
 }
 
 function formatStatusTime(value) {
@@ -44,11 +46,12 @@ async function refreshRunStatus() {
     return;
   }
 
+  const runProvider = providerName(status.aiProvider || aiProvider);
   const states = {
-    sending: { icon: "↗", title: "Sending to ChatGPT…", text: "Preparing the project, repository, and request context.", loading: true },
-    working: { icon: "✦", title: "ChatGPT is working…", text: "Track the live response below as it appears in ChatGPT.", loading: true },
-    done: { icon: "✓", title: "Complete", text: "ChatGPT completed this request successfully.", loading: false },
-    blocked: { icon: "!", title: "Action required", text: "ChatGPT encountered a blocker and needs your attention.", loading: false },
+    sending: { icon: "↗", title: `Sending to ${runProvider}…`, text: "Preparing the project, repository, and request context.", loading: true },
+    working: { icon: "✦", title: `${runProvider} is working…`, text: `Track the live response below as it appears in ${runProvider}.`, loading: true },
+    done: { icon: "✓", title: "Complete", text: `${runProvider} completed this request successfully.`, loading: false },
+    blocked: { icon: "!", title: "Action required", text: `${runProvider} encountered a blocker and needs your attention.`, loading: false },
     error: { icon: "×", title: "Execution error", text: status.error || "This request could not be completed.", loading: false },
   };
 
@@ -96,7 +99,7 @@ async function refreshChat() {
       ui.memoryState.textContent = displayConversationTitle(conversation, conversation.lockedTitle || conversation.title || "Conversation exclusive to this project");
     } else {
       const tabs = await chatTabs();
-      ui.help.textContent = tabs.length ? "An open conversation was found. You can use it or create a new one." : "Open ChatGPT in a tab or create a new conversation here.";
+      ui.help.textContent = tabs.length ? `An open ${providerName()} conversation was found. You can use it or create a new one.` : `Open ${providerName()} in a tab or create a new conversation here.`;
     }
   } finally { refreshingChat = false; }
 }
@@ -161,9 +164,10 @@ function showFeedback(message, tone = "") {
   }
   ui.feedback.hidden = false; ui.feedback.textContent = text; ui.feedback.dataset.tone = tone;
 }
-async function chooseChatTab() {
-  const tabs = await chatTabs();
-  if (!tabs.length) throw new Error("No ChatGPT conversations are open. Open a ChatGPT tab or create a new conversation.");
+async function chooseChatTab(provider = aiProvider) {
+  const tabs = await chatTabs(provider);
+  const config = providerConfig(provider);
+  if (!tabs.length) throw new Error(`No ${config.name} conversations are open. Open a ${config.name} tab or create a new conversation.`);
 
   const projectId = workspace.lovableProjectId;
   const all = await bindings();
@@ -171,7 +175,7 @@ async function chooseChatTab() {
   for (const [ownerProjectId, rec] of Object.entries(all)) {
     for (const item of rec?.conversations || []) {
       const lockedUrl = String(item.lockedUrl || item.url || "").trim();
-      if (lockedUrl && lockedUrl !== "https://chatgpt.com/") ownership.set(lockedUrl, ownerProjectId);
+      if ((item.aiProvider || "chatgpt") === provider && lockedUrl && !isProviderNewUrl(provider, lockedUrl)) ownership.set(lockedUrl, ownerProjectId);
     }
   }
 
@@ -180,7 +184,7 @@ async function chooseChatTab() {
     overlay.className = "lb-chat-picker";
     overlay.setAttribute("role", "dialog");
     overlay.setAttribute("aria-modal", "true");
-    overlay.innerHTML = '<section class="lb-chat-picker-panel"><header><div><span>// CHATGPT</span><strong>Switch conversation</strong><p>Choose the conversation to reserve for this project.</p></div><button type="button" data-close aria-label="Close">×</button></header><div class="lb-chat-picker-list"></div><button type="button" class="lb-chat-picker-cancel" data-close>Cancel</button></section>';
+    overlay.innerHTML = `<section class="lb-chat-picker-panel"><header><div><span>// ${config.name.toUpperCase()}</span><strong>Switch conversation</strong><p>Choose the conversation to reserve for this project.</p></div><button type="button" data-close aria-label="Close">×</button></header><div class="lb-chat-picker-list"></div><button type="button" class="lb-chat-picker-cancel" data-close>Cancel</button></section>`;
 
     const list = overlay.querySelector(".lb-chat-picker-list");
     for (const tab of tabs) {
@@ -192,9 +196,9 @@ async function chooseChatTab() {
       button.disabled = unavailable;
 
       const title = document.createElement("strong");
-      title.textContent = tab.title || "ChatGPT";
+      title.textContent = tab.title || config.name;
       const url = document.createElement("span");
-      url.textContent = tab.url === "https://chatgpt.com/" ? "New conversation without its own URL yet" : tab.url;
+      url.textContent = isProviderNewUrl(provider, tab.url) ? "New conversation without its own URL yet" : tab.url;
       const state = document.createElement("small");
       state.textContent = unavailable ? "Reserved for another project" : (tab.active ? "Active tab" : "Available");
       button.append(title, url, state);
@@ -216,26 +220,31 @@ async function chooseChatTab() {
 }
 
 async function useOpenConversation() {
+  const provider = aiProvider;
   if (!workspace.lovableProjectId) throw new Error(`Open a ${activeBuilderName()} project first.`);
-  const selected = await chooseChatTab();
+  const selected = await chooseChatTab(provider);
   if (!selected?.tabId) return false;
-  await linkTab(selected.tabId);
+  await linkTab(selected.tabId, provider);
   return true;
 }
 async function openActiveConversation() {
   const rec = await record(workspace.lovableProjectId); const conversation = active(rec); if (!conversation) return;
+  const provider = conversation.aiProvider || aiProvider;
+  const config = providerConfig(provider);
   let tab = await resolveTab(conversation);
-  if (!tab && conversation.url?.startsWith("https://chatgpt.com/")) {
-    tab = await chrome.tabs.create({ url: conversation.url, active: true });
+  const reopenUrl = conversation.lockedUrl || conversation.url || config.newUrl;
+  if (!tab && reopenUrl.startsWith(`${config.origin}/`)) {
+    tab = await chrome.tabs.create({ url: reopenUrl, active: true });
     await update(workspace.lovableProjectId, (current) => ({ ...current, conversations: current.conversations.map((item) => item.id === conversation.id ? { ...item, tabId: tab.id, url: tab.url || item.url, closedAt: "" } : item) }));
   }
-  if (tab?.id) { await activateRelay(tab.id); await chrome.tabs.update(tab.id, { active: true }); }
+  if (tab?.id) { await activateRelay(tab.id, provider); await chrome.tabs.update(tab.id, { active: true }); }
 }
 
 function renderSendButton(sending = false) {
+  const name = providerName();
   ui.sendCommand.innerHTML = sending
-    ? '<span class="send-mark" aria-hidden="true">◌</span><b>Sending…</b><span class="send-arrow" aria-hidden="true">→</span>'
-    : '<span class="send-mark" aria-hidden="true">✦</span><b>Send</b><span class="send-arrow" aria-hidden="true">➜</span>';
+    ? `<span class="send-mark" aria-hidden="true">◌</span><b>Sending to ${name}…</b><span class="send-arrow" aria-hidden="true">→</span>`
+    : `<span class="send-mark" aria-hidden="true">✦</span><b>Send to ${name}</b><span class="send-arrow" aria-hidden="true">➜</span>`;
 }
 
 async function sendCommand() {
@@ -248,7 +257,8 @@ async function sendCommand() {
     return;
   }
   let rec = await record(workspace.lovableProjectId);
-  if (!active(rec)) { showFeedback("Connect a ChatGPT conversation before sending."); ui.setupCard.hidden = false; return; }
+  const provider = await selectedAiProvider();
+  if (!active(rec, provider)) { showFeedback(`Connect a ${providerName(provider)} conversation before sending.`); ui.setupCard.hidden = false; return; }
   ui.sendCommand.disabled = true;
   renderSendButton(true);
   try {
@@ -256,14 +266,14 @@ async function sendCommand() {
     const source = tabs.find((tab) => tab.url?.includes(workspace.lovableProjectId)) || tabs[0];
     if (!source?.id) throw new Error(`Could not find this project's ${activeBuilderName()} tab.`);
     const skills = await selectedSkills();
-    const response = await chrome.tabs.sendMessage(source.id, { type: "LOVABURST_SUBMIT_OBJECTIVE", objective, skills });
+    const response = await chrome.tabs.sendMessage(source.id, { type: "LOVABURST_SUBMIT_OBJECTIVE", objective, skills, aiProvider: provider });
     if (!response?.ok) throw new Error(response?.error || "Could not send the request.");
     await update(workspace.lovableProjectId, (current) => {
       const previous = current.recentObjectives?.[current.recentObjectives.length - 1];
       const repeated = previous && String(previous.text || "") === objective && Date.now() - new Date(previous.createdAt || 0).getTime() < 30000;
       return repeated ? current : { ...current, recentObjectives: [...(current.recentObjectives || []), { text: objective, createdAt: now() }].slice(-50) };
     });
-    ui.commandInput.value = ""; updateCounter(); ui.commandInput.dispatchEvent(new Event("input", { bubbles: true })); showFeedback("Sent to ChatGPT."); await refreshRunStatus();
+    ui.commandInput.value = ""; updateCounter(); ui.commandInput.dispatchEvent(new Event("input", { bubbles: true })); showFeedback(`Sent to ${providerName(provider)}.`); await refreshRunStatus();
   } catch (error) {
     const message = error?.message || String(error);
     showFeedback(/github|repository|repositório|no github|sem github|not connected|não conectado/i.test(message)
@@ -309,16 +319,18 @@ async function hideLovableBadge() {
     throw new Error("Connect this project to GitHub before removing its badge.");
   }
   const rec = await record(workspace.lovableProjectId);
-  if (!active(rec)) throw new Error("Connect a ChatGPT conversation before removing the badge.");
+  const provider = await selectedAiProvider();
+  if (!active(rec, provider)) throw new Error(`Connect a ${providerName(provider)} conversation before removing the badge.`);
   const tab = await findCurrentLovableTab();
   if (!tab?.id) throw new Error("Open a Lovable project before removing its badge.");
   const response = await chrome.tabs.sendMessage(tab.id, {
     type: "LOVABURST_SUBMIT_OBJECTIVE",
     objective: HIDE_LOVABLE_BADGE_OBJECTIVE,
     skills: [],
+    aiProvider: provider,
   });
   if (!response?.ok) throw new Error(response?.error || "Could not send the badge-removal request.");
-  showFeedback("Badge-removal request sent to ChatGPT.");
+  showFeedback(`Badge-removal request sent to ${providerName(provider)}.`);
 }
 
 async function downloadCurrentProject() {
@@ -343,17 +355,6 @@ ui.useOpen.addEventListener("click", async () => { ui.useOpen.disabled = true; u
 ui.create.addEventListener("click", async () => { ui.create.disabled = true; ui.help.textContent = "Creating and preparing the conversation…"; try { await newConversation(); await refreshChat(); } catch (error) { ui.help.textContent = error?.message || String(error); } finally { ui.create.disabled = false; } });
 ui.open.addEventListener("click", async () => { try { await openActiveConversation(); } catch (error) { showFeedback(error?.message || String(error)); } });
 ui.compactNew.addEventListener("click", async () => { ui.compactNew.disabled = true; try { await newConversation(); await refreshChat(); } catch (error) { showFeedback(error?.message || String(error)); } finally { ui.compactNew.disabled = false; } });
-ui.useAnother.addEventListener("click", async () => {
-  ui.useAnother.disabled = true;
-  try {
-    const changed = await useOpenConversation();
-    if (changed) {
-      await refreshChat();
-      showFeedback("Conversation selected and locked exclusively to this project.", "success");
-    }
-  } catch (error) { showFeedback(error?.message || String(error)); }
-  finally { ui.useAnother.disabled = false; }
-});
 ui.commandInput.addEventListener("input", updateCounter);
 ui.commandInput.addEventListener("keydown", (event) => {
   if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
@@ -474,6 +475,12 @@ ui.platformButtons.forEach((button) => button.addEventListener("click", async ()
   await refreshChat();
   await refreshRunStatus();
 }));
+ui.aiProviderButtons.forEach((button) => button.addEventListener("click", async () => {
+  await selectAiProvider(button.dataset.aiProvider);
+  renderSendButton(false);
+  await refreshChat();
+  await refreshRunStatus();
+}));
 ui.clearSkills?.addEventListener("click", async () => { await saveSelectedSkills([]); await renderSkills(); });
 ui.refreshData?.addEventListener("click", async () => { await refreshRepository(); await refreshChat(); await refreshRunStatus(); await renderSkills(); showFeedback("Data updated."); });
 ui.settings?.addEventListener("click", () => showFeedback("Advanced settings are part of LovaRPM's commercial tier."));
@@ -501,4 +508,4 @@ chrome.tabs.onUpdated.addListener(async (_tabId, changeInfo) => {
 chrome.tabs.onActivated.addListener(async () => { await refreshWorkspace(); await refreshChat(); });
 chrome.storage.onChanged.addListener((changes, area) => { if (area !== "local") return; if (changes.config?.newValue) void renderConfig(changes.config.newValue); if (changes.workspaceBindings || changes.pendingPrompt) void refreshWorkspace(); if (changes.projectChatBindings) void refreshChat(); if (changes.projectRunStatuses) void refreshRunStatus(); if (changes.projectSkillSelections) void renderSkills(); });
 window.setInterval(() => void refreshWorkspace(), 900); window.setInterval(() => void refreshChat(), 1800);
-(async () => { const version = chrome.runtime.getManifest().version; ui.versionText.textContent = `v${version}`; ui.footerVersion.textContent = `LovaRPM v${version}`; updateCounter(); renderSendButton(false); await selectPlatform(await selectedPlatform()); await renderConfig(await getConfig()); await refreshWorkspace(); await refreshChat(); await refreshRunStatus(); await checkForBrowserManagedUpdate(); })();
+(async () => { const version = chrome.runtime.getManifest().version; ui.versionText.textContent = `v${version}`; ui.footerVersion.textContent = `LovaRPM v${version}`; updateCounter(); await selectAiProvider(await selectedAiProvider()); renderSendButton(false); await selectPlatform(await selectedPlatform()); await renderConfig(await getConfig()); await refreshWorkspace(); await refreshChat(); await refreshRunStatus(); await checkForBrowserManagedUpdate(); })();

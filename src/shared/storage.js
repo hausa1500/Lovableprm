@@ -2,6 +2,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   enabled: true,
   lovableEnabled: true,
   chatgptEnabled: true,
+  claudeEnabled: true,
 });
 
 export async function getConfig() {

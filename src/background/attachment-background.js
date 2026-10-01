@@ -71,41 +71,46 @@ async function skills(projectId) {
   return Array.isArray(ids) ? ids.filter((id) => SKILL_IDS.has(id)).slice(0, 42) : [];
 }
 
-async function chat(projectId) {
+async function chat(projectId, provider) {
   const stored = await chrome.storage.local.get("projectChatBindings");
   const record = stored.projectChatBindings?.[projectId];
-  const conversation = record?.conversations?.find((item) => item.id === record.activeConversationId);
-  if (!conversation) throw new Error("Connect a ChatGPT conversation before sending.");
+  const conversationId = record?.activeConversationIds?.[provider] || record?.activeConversationId;
+  const conversation = record?.conversations?.find((item) => item.id === conversationId);
+  const config = globalThis.LovaRPMProviders?.[provider];
+  if (!conversation || (conversation.aiProvider || "chatgpt") !== provider) throw new Error(`Connect a ${config?.name || "AI provider"} conversation before sending.`);
+  const expectedUrl = String(conversation.lockedUrl || (!conversation.pendingNavigation ? conversation.url : "") || "").trim();
 
   if (conversation.tabId) {
     try {
       const tab = await chrome.tabs.get(conversation.tabId);
-      if (tab?.url?.startsWith("https://chatgpt.com/")) return tab;
+      if (tab?.url?.startsWith(`${config.origin}/`) && (!expectedUrl || expectedUrl === tab.url || conversation.pendingNavigation)) return tab;
     } catch {}
   }
 
-  const tabs = await chrome.tabs.query({ url: ["https://chatgpt.com/*"] });
-  const exact = tabs.find((tab) => conversation.url && tab.url === conversation.url);
+  const tabs = await chrome.tabs.query({ url: config.patterns });
+  const exact = tabs.find((tab) => expectedUrl && tab.url === expectedUrl);
   if (exact) return exact;
   throw new Error("The linked ChatGPT conversation is unavailable.");
 }
 
-async function ensureBridges(tabId) {
+async function ensureBridges(tabId, provider) {
+  const config = globalThis.LovaRPMProviders?.[provider];
   try {
     const ping = await chrome.tabs.sendMessage(tabId, { type: "LOVABURST_CONTENT_PING" });
-    if (!ping?.ok) throw new Error("bridge ausente");
+    if (!ping?.ok || ping.source !== config.pingSource) throw new Error("bridge ausente");
   } catch {
-    await chrome.scripting.executeScript({ target: { tabId }, files: ["src/content/chatgpt.js"] });
+    await chrome.scripting.executeScript({ target: { tabId }, files: [config.bridgeFile] });
   }
 
+  const expectedVersion = provider === "chatgpt" ? ATTACHMENT_BRIDGE_VERSION : "1.0.0";
   try {
     const ping = await chrome.tabs.sendMessage(tabId, { type: "LOVABURST_ATTACHMENTS_PING" });
-    if (ping?.ok && ping.version === ATTACHMENT_BRIDGE_VERSION) return;
+    if (ping?.ok && ping.version === expectedVersion) return;
   } catch {}
 
-  await chrome.scripting.executeScript({ target: { tabId }, files: ["src/content/chatgpt-attachments.js"] });
+  if (provider === "chatgpt") await chrome.scripting.executeScript({ target: { tabId }, files: ["src/content/chatgpt-attachments.js"] });
   const ping = await chrome.tabs.sendMessage(tabId, { type: "LOVABURST_ATTACHMENTS_PING" });
-  if (!ping?.ok || ping.version !== ATTACHMENT_BRIDGE_VERSION) throw new Error("The current LovaRPM attachment bridge did not respond in ChatGPT.");
+  if (!ping?.ok || ping.version !== expectedVersion) throw new Error(`The current LovaRPM attachment bridge did not respond in ${config.name}.`);
 }
 
 async function submit(message, sender) {
@@ -117,8 +122,14 @@ async function submit(message, sender) {
   if (!projectId) throw new Error("Could not identify the platform project.");
 
   const stored = await chrome.storage.local.get(["workspaceBindings", "config"]);
-  if (stored.config?.enabled === false || stored.config?.chatgptEnabled === false) {
-    throw new Error("The ChatGPT integration is disabled.");
+  const selected = await chrome.storage.local.get("selectedAiProvider");
+  const provider = message.aiProvider === "claude" || message.aiProvider === "chatgpt"
+    ? message.aiProvider
+    : selected.selectedAiProvider === "claude" ? "claude" : "chatgpt";
+  const config = globalThis.LovaRPMProviders?.[provider];
+  if (!config) throw new Error("Unsupported AI provider.");
+  if (stored.config?.enabled === false || stored.config?.[config.enabledConfigKey] === false) {
+    throw new Error(`The ${config.name} integration is disabled.`);
   }
 
   const repository = String(message.repository || stored.workspaceBindings?.[projectId]?.repository || "");
@@ -128,6 +139,7 @@ async function submit(message, sender) {
     title: String(message.title || sender?.tab?.title || ""),
     capturedAt: new Date().toISOString(),
     repository,
+    aiProvider: provider,
     repositoryDetectionSource: String(message.repositoryDetectionSource || "attachment-flow"),
     lovableProjectId: projectId,
     platform: String(message.url || sender?.tab?.url || "").startsWith("https://app.base44.com/") ? "base44" : "lovable",
@@ -138,7 +150,7 @@ async function submit(message, sender) {
   if (!preparedPrompt) throw new Error("The server did not prepare the attachment operation.");
   const implementationPrompt = await withPrmV5ImplementationContext(preparedPrompt, payload);
   const prompt = withSkillInstructions(implementationPrompt, payload.skills);
-  const tab = await chat(projectId);
+  const tab = await chat(projectId, provider);
   const source = sender?.tab?.id ? await chrome.tabs.get(sender.tab.id).catch(() => null) : null;
   const wasActive = Boolean(tab.active);
 
@@ -156,29 +168,31 @@ async function submit(message, sender) {
       await sleep(220);
     }
 
-    await ensureBridges(tab.id);
+    await ensureBridges(tab.id, provider);
 
     const prepared = await chrome.tabs.sendMessage(tab.id, {
       type: "LOVABURST_PREPARE_ATTACHMENTS",
       attachments,
     });
     if (!prepared?.ok || Number(prepared.count || 0) !== attachments.length) {
-      throw new Error(prepared?.error || `Could not attach ${attachments[0]?.name || "the file"} to ChatGPT. The message was not sent.`);
+      throw new Error(prepared?.error || `Could not attach ${attachments[0]?.name || "the file"} to ${config.name}. The message was not sent.`);
     }
 
     const dispatched = await chrome.tabs.sendMessage(tab.id, {
-      type: "LOVABURST_SUBMIT_TO_CHATGPT",
+      type: config.submitMessage,
       prompt,
       implementationTask: true,
     });
     if (!dispatched?.ok) {
-      throw new Error(dispatched?.error || "ChatGPT did not confirm that the message was sent.");
+      throw new Error(dispatched?.error || `${config.name} did not confirm that the message was sent.`);
     }
 
     await status(projectId, {
       status: "working",
       dispatchedAt: new Date().toISOString(),
-      chatgptTabId: tab.id,
+      providerTabId: tab.id,
+      aiProvider: provider,
+      ...(provider === "chatgpt" ? { chatgptTabId: tab.id } : {}),
       error: "",
     });
     return { ok: true };

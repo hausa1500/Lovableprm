@@ -69,7 +69,7 @@
 
       const timeout = new Promise((_, reject) => {
         timeoutId = setTimeout(
-          () => reject(new Error("ChatGPT took too long to return the enhanced prompt.")),
+          () => reject(new Error(`${providerName()} took too long to return the enhanced prompt.`)),
           110000,
         );
       });
@@ -79,13 +79,14 @@
           type: "LOVABURST_ENHANCE_FROM_POPUP",
           text,
           projectId,
+          aiProvider: await selectedAiProvider(),
         }),
         timeout,
       ]);
 
       const enhanced = String(response?.text || "").trim();
       if (!response?.ok || !enhanced) {
-        throw new Error(response?.error || "ChatGPT did not return an enhanced prompt.");
+        throw new Error(response?.error || `${providerName()} did not return an enhanced prompt.`);
       }
 
       input.value = enhanced;

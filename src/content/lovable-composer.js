@@ -42,6 +42,10 @@
     toast.querySelector(".lb-close").style.display = options.closable ? "block" : "none";
     if (options.duration) toastTimer = setTimeout(hideToast, options.duration);
   }
+  async function selectedProviderName() {
+    const stored = await chrome.storage.local.get("selectedAiProvider");
+    return stored.selectedAiProvider === "claude" ? "Claude" : "ChatGPT";
+  }
   function hideToast() { if (toast) toast.dataset.open = "false"; clearTimeout(toastTimer); }
 
   function renderControls() {
@@ -49,7 +53,7 @@
     const active = core.active(), mode = shadow.querySelector(".lb-mode"), boostButton = shadow.querySelector(".lb-boost");
     const platformName = core.state.platform === "base44" ? "Base44" : "Lovable";
     mode.dataset.on = String(active); mode.querySelector(".lb-label").textContent = active ? "LovaRPM" : platformName;
-    mode.title = active ? "LovaRPM mode is enabled. License and ChatGPT connection are checked when sending." : `Direct ${platformName} mode — your requests will be sent directly to ${platformName}.`;
+    mode.title = active ? "LovaRPM mode is enabled. License and selected provider connection are checked when sending." : `Direct ${platformName} mode — your requests will be sent directly to ${platformName}.`;
     controls.dataset.active = String(active);
     boostButton.disabled = !core.state.projectId || !core.state.globalEnabled || busy || enhancing;
   }
@@ -102,7 +106,8 @@
       const response = await chrome.runtime.sendMessage({ type: "LOVABURST_COMPOSER_SUBMIT", objective: text, projectId: core.state.projectId });
       if (!response?.ok) throw new Error(response?.error || "Could not send through LovaRPM.");
       if (core.state.composer?.isConnected && core.read() === text) core.write("");
-      showToast("working", "LovaRPM", "ChatGPT is working...", { loading: true });
+      const providerName = response.aiProvider === "claude" ? "Claude" : "ChatGPT";
+      showToast("working", "LovaRPM", `${providerName} is working...`, { loading: true });
     } catch (error) { showToast("error", "LovaRPM", error instanceof Error ? error.message : "Could not complete the submission.", { closable: true, duration: 9000 }); if (core.state.host) core.state.host.dataset.lovaburstStatus = "error"; resetFrameSoon(); }
     finally { busy = false; renderControls(); decorate(); }
   }
@@ -126,7 +131,8 @@
     if (!core.state.composer?.isConnected || enhancing || busy || !core.state.globalEnabled || !core.state.projectId) return;
     const original = core.read();
     if (!original) { showToast("", "Enhance prompt", "First, enter the text you want to improve.", { duration: 3200 }); return; }
-    enhancing = true; renderControls(); decorate(); showToast("working", "LovaRPM", "Enhancing your prompt with ChatGPT...", { loading: true });
+    const providerName = await selectedProviderName();
+    enhancing = true; renderControls(); decorate(); showToast("working", "LovaRPM", `Enhancing your prompt with ${providerName}...`, { loading: true });
     try {
       const enhanced = await enhanceText(original);
       if (core.state.composer?.isConnected && core.read() === original) {
@@ -145,8 +151,9 @@
       const status = run?.status || "", signature = `${status}|${run?.updatedAt || ""}|${run?.marker || ""}`;
       if (!status || signature === lastStatusSignature) return; lastStatusSignature = signature;
       if (core.state.host) core.state.host.dataset.lovaburstStatus = status;
-      if (status === "sending") showToast("sending", "LovaRPM", "Sending your request...", { loading: true });
-      else if (status === "working") showToast("working", "LovaRPM", "ChatGPT is working...", { loading: true });
+      const providerName = run?.aiProvider === "claude" ? "Claude" : "ChatGPT";
+      if (status === "sending") showToast("sending", "LovaRPM", `Sending to ${providerName}...`, { loading: true });
+      else if (status === "working") showToast("working", "LovaRPM", `${providerName} is working...`, { loading: true });
       else if (status === "done") { showToast("done", "LovaRPM", "Change complete.", { duration: 3800 }); resetFrameSoon(1800); }
       else if (status === "blocked") { showToast("blocked", "LovaRPM", "The run needs your attention.", { closable: true, duration: 10000 }); resetFrameSoon(); }
       else if (status === "error") { showToast("error", "LovaRPM", "Could not complete the run.", { closable: true, duration: 10000 }); resetFrameSoon(); }

@@ -72,6 +72,7 @@
     sending = true;
     sendButton.disabled = true;
     try {
+      const selectedProvider = (await chrome.storage.local.get("selectedAiProvider")).selectedAiProvider === "claude" ? "claude" : "chatgpt";
       const files = await attachmentsApi.serialize(selected);
       const response = await chrome.runtime.sendMessage({
         type: "LOVABURST_SUBMIT_WITH_ATTACHMENTS",
@@ -80,14 +81,15 @@
         projectId: activeWorkspace.lovableProjectId,
         repository: activeWorkspace.repository || "",
         url: activeWorkspace.sourceUrl || "",
-        title: activeWorkspace.sourceTitle || ""
+        title: activeWorkspace.sourceTitle || "",
+        aiProvider: selectedProvider
       });
       if (!response?.ok) throw new Error(response?.error || "Could not send the attachments.");
       input.value = "";
       while (selected.length) attachmentsApi.release(selected.pop());
       render();
       input.dispatchEvent(new Event("input", { bubbles: true }));
-      if (typeof showFeedback === "function") showFeedback("Sent to ChatGPT.");
+      if (typeof showFeedback === "function") showFeedback(`Sent to ${selectedProvider === "claude" ? "Claude" : "ChatGPT"}.`);
     } catch (error) {
       if (typeof showFeedback === "function") showFeedback(error instanceof Error ? error.message : String(error));
     } finally {

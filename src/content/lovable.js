@@ -349,24 +349,28 @@
     await chrome.storage.local.set({ projectChatBindings: bindings });
   }
 
-  async function activateProjectChat(workspace) {
+  async function activateProjectChat(workspace, requestedProvider) {
     const projectId = workspace?.lovableProjectId || "";
     if (!projectId) throw new Error("Could not identify the Lovable project.");
 
     const stored = await chrome.storage.local.get("projectChatBindings");
     const record = stored.projectChatBindings?.[projectId];
+    const provider = requestedProvider === "claude" || requestedProvider === "chatgpt"
+      ? requestedProvider
+      : stored.selectedAiProvider === "claude" ? "claude" : "chatgpt";
+    const providerName = provider === "claude" ? "Claude" : "ChatGPT";
+    const conversationId = record?.activeConversationIds?.[provider] || record?.activeConversationId;
     const conversation = record?.conversations?.find(
-      (item) => item.id === record.activeConversationId,
+      (item) => item.id === conversationId,
     );
 
-    if (!conversation?.tabId) {
-      throw new Error(
-        "This project does not yet have an active ChatGPT conversation. Open the LovaRPM panel and link or create a conversation.",
-      );
+    if (!conversation?.tabId || (conversation.aiProvider || "chatgpt") !== provider) {
+      throw new Error(`This project does not yet have an active ${providerName} conversation. Open the LovaRPM panel and link or create one.`);
     }
 
     const response = await chrome.runtime.sendMessage({
-      type: "LOVABURST_LINK_CHATGPT",
+      type: "LOVABURST_LINK_PROVIDER",
+      provider,
       tabId: conversation.tabId,
     });
 
@@ -376,6 +380,7 @@
           "This project's conversation is unavailable. Open the LovaRPM panel and select another conversation.",
       );
     }
+    return provider;
   }
 
   async function capturePrompt(button) {
@@ -392,10 +397,11 @@
 
     try {
       const workspace = await resolveWorkspace();
-      button.textContent = workspace.repository ? `Sending · ${workspace.repository}` : "Sending to ChatGPT…";
+      button.textContent = workspace.repository ? `Sending · ${workspace.repository}` : "Sending via LovaRPM…";
 
       await rememberObjectiveForProject(workspace, text);
-      await activateProjectChat(workspace);
+      const aiProvider = await activateProjectChat(workspace);
+      const providerName = aiProvider === "claude" ? "Claude" : "ChatGPT";
 
       const response = await chrome.runtime.sendMessage({
         type: "LOVABURST_PROMPT_CAPTURED",
@@ -409,26 +415,27 @@
           lovableProjectId: workspace.lovableProjectId,
           repositoryDetectionSource: workspace.detectionSource,
           apiDiagnostics: workspace.apiDiagnostics,
+          aiProvider,
         },
       });
 
       if (!response?.ok) throw new Error(response?.error || "Failed to send the prompt.");
 
       button.dataset.state = "sent";
-      button.textContent = workspace.repository ? `Sent · ${workspace.repository} ✓` : "Sent to ChatGPT ✓";
+      button.textContent = workspace.repository ? `Sent · ${workspace.repository} ✓` : `Sent to ${providerName} ✓`;
       window.setTimeout(() => resetButton(button), 2200);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const needsChat =
-        message.includes("This project does not yet have an active ChatGPT conversation") ||
+        message.includes("This project does not yet have an active ") ||
         message.includes("This project's conversation is unavailable") ||
         message.includes("ainda não possui uma conversa ativa do ChatGPT") ||
         message.includes("conversa deste projeto não está disponível");
 
       if (needsChat) {
         button.dataset.state = "needs-chat";
-        button.textContent = "Connect ChatGPT";
-        button.title = "Open the LovaRPM panel to create or connect a conversation to this project.";
+        button.textContent = "Connect provider";
+        button.title = "Open the LovaRPM panel to create or connect the selected provider conversation to this project.";
         window.setTimeout(() => resetButton(button), 4200);
         return;
       }
@@ -450,7 +457,7 @@
       button.id = BUTTON_ID;
       button.type = "button";
       button.textContent = "Send via LovaRPM";
-      button.setAttribute("aria-label", "Send this prompt to ChatGPT through LovaRPM");
+      button.setAttribute("aria-label", "Send this prompt to the selected AI provider through LovaRPM");
       button.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -543,7 +550,7 @@
           const workspace = await resolveWorkspace();
 
           await rememberObjectiveForProject(workspace, objective);
-          await activateProjectChat(workspace);
+          const aiProvider = await activateProjectChat(workspace, message.aiProvider);
 
           const response = await chrome.runtime.sendMessage({
             type: "LOVABURST_PROMPT_CAPTURED",
@@ -558,6 +565,7 @@
               repositoryDetectionSource: workspace.detectionSource,
               apiDiagnostics: workspace.apiDiagnostics,
               skills,
+              aiProvider,
             },
           });
 
@@ -565,9 +573,9 @@
             throw new Error(response?.error || "Falha ao enviar o prompt.");
           }
 
-          return response;
+          return { ...response, aiProvider };
         })
-        .then(() => sendResponse({ ok: true }))
+        .then((result) => sendResponse({ ok: true, aiProvider: result.aiProvider }))
         .catch((error) =>
           sendResponse({
             ok: false,

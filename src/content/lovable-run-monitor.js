@@ -16,6 +16,7 @@
   let initialTimer = null;
   let refreshTimer = null;
   let lastRunStatus = "";
+  let lastRunProvider = "chatgpt";
   let refreshSeconds = DEFAULT_REFRESH_SECONDS;
   let autoCheckPaused = false;
   let dismissed = false;
@@ -187,6 +188,7 @@
 
   function render(run) {
     const status = String(run?.status || "idle").toLowerCase();
+    lastRunProvider = run?.aiProvider === "claude" ? "claude" : "chatgpt";
     const wasActive = ["sending", "working"].includes(lastRunStatus);
     const isActive = ["sending", "working"].includes(status);
     if (!wasActive && isActive) {
@@ -250,7 +252,7 @@
       if (!stopped && ["sending", "working"].includes(lastRunStatus)) {
         const id = projectId();
         if (id && contextAvailable()) {
-          chrome.runtime.sendMessage({ type: "LOVABURST_REFRESH_CHATGPT_RESULT_V0304", projectId: id }).catch((error) => {
+          chrome.runtime.sendMessage({ type: "LOVABURST_REFRESH_PROVIDER_RESULT", projectId: id, provider: lastRunProvider }).catch((error) => {
             if (isContextInvalidation(error) || !contextAvailable()) stopAfterContextInvalidation();
           });
         }

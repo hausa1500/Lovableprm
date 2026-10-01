@@ -1,13 +1,13 @@
 "use strict";
 
 async function getConfig() {
-  const DEFAULT_CONFIG = { enabled: true, lovableEnabled: true, chatgptEnabled: true };
+  const DEFAULT_CONFIG = { enabled: true, lovableEnabled: true, chatgptEnabled: true, claudeEnabled: true };
   const stored = await chrome.storage.local.get("config");
   return { ...DEFAULT_CONFIG, ...(stored.config ?? {}) };
 }
 
 async function setConfig(nextConfig) {
-  const DEFAULT_CONFIG = { enabled: true, lovableEnabled: true, chatgptEnabled: true };
+  const DEFAULT_CONFIG = { enabled: true, lovableEnabled: true, chatgptEnabled: true, claudeEnabled: true };
   const config = { ...DEFAULT_CONFIG, ...nextConfig };
   await chrome.storage.local.set({ config });
   return config;
@@ -75,14 +75,26 @@ const ui = {
   hideBadge: $("#hideLovableBadgeButton"),
   downloadProject: $("#downloadProjectButton"),
   platformButtons: [...document.querySelectorAll("[data-platform]")],
+  aiProviderButtons: [...document.querySelectorAll("[data-ai-provider]")],
 };
 
 let workspace = { repository: "", lovableProjectId: "", sourceTitle: "", sourceUrl: "", platform: "lovable", outsideLovable: true };
+let aiProvider = "chatgpt";
 let refreshingWorkspace = false;
 let refreshingChat = false;
 
 const now = () => new Date().toISOString();
 const makeId = () => crypto.randomUUID?.() || `chat-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+const providerConfig = (provider = aiProvider) => globalThis.LovaRPMProviders?.[provider] || globalThis.LovaRPMProviders?.chatgpt;
+const providerName = (provider = aiProvider) => providerConfig(provider)?.name || "ChatGPT";
+
+function setProviderConversation(rec, conversation, provider = aiProvider) {
+  return {
+    ...rec,
+    activeConversationId: conversation.id,
+    activeConversationIds: { ...(rec.activeConversationIds || {}), [provider]: conversation.id },
+  };
+}
 
 async function selectedPlatform() {
   const stored = await chrome.storage.local.get(PLATFORM_KEY);
@@ -94,6 +106,37 @@ async function selectPlatform(platform) {
   await chrome.storage.local.set({ [PLATFORM_KEY]: value });
   ui.platformButtons.forEach((button) => button.classList.toggle("active", button.dataset.platform === value));
   return value;
+}
+
+async function selectedAiProvider() {
+  const stored = await chrome.storage.local.get("selectedAiProvider");
+  return stored.selectedAiProvider === "claude" ? "claude" : "chatgpt";
+}
+
+async function selectAiProvider(provider) {
+  aiProvider = provider === "claude" ? "claude" : "chatgpt";
+  await chrome.storage.local.set({ selectedAiProvider: aiProvider });
+  ui.aiProviderButtons.forEach((button) => {
+    const active = button.dataset.aiProvider === aiProvider;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  const name = globalThis.LovaRPMProviders?.[aiProvider]?.name || "ChatGPT";
+  const sendLabel = ui.sendCommand?.querySelector("b");
+  if (sendLabel) sendLabel.textContent = `Send to ${name}`;
+  const setLabel = (button, label) => {
+    const primary = button?.querySelector("strong");
+    if (primary) primary.textContent = label;
+    if (button) button.title = label;
+  };
+  setLabel(ui.useOpen, `Use open ${name} conversation`);
+  setLabel(ui.create, `Create new ${name} conversation`);
+  setLabel(ui.useAnother, `Switch ${name} conversation`);
+  if (ui.open) ui.open.title = `Open linked ${name} conversation`;
+  if (ui.compactNew) ui.compactNew.title = `Create new ${name} conversation`;
+  const brandDetails = document.querySelector(".brand-copy > span");
+  if (brandDetails) brandDetails.textContent = `Lovable · Base44 · ${name} · GitHub`;
+  return aiProvider;
 }
 
 const SKILLS = {
@@ -217,19 +260,23 @@ async function renderHistory() {
   for (const item of items) { const row = document.createElement("article"); row.className = "history-item"; const text = document.createElement("p"); text.textContent = String(item?.text || ""); const time = document.createElement("time"); const date = item?.createdAt ? new Date(item.createdAt) : null; time.textContent = date && !Number.isNaN(date.valueOf()) ? date.toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" }) : ""; row.append(text, time); list.append(row); }
 }
 
-function active(rec) {
-  return rec?.conversations?.find((item) => item.id === rec.activeConversationId) || null;
+function active(rec, provider = aiProvider) {
+  const activeId = rec?.activeConversationIds?.[provider] || rec?.activeConversationId;
+  const conversation = rec?.conversations?.find((item) => item.id === activeId) || null;
+  if (conversation && (conversation.aiProvider || "chatgpt") === provider) return conversation;
+  return rec?.conversations?.find((item) => (item.aiProvider || "chatgpt") === provider) || null;
 }
 
-async function chatTabs() {
-  const tabs = await chrome.tabs.query({ url: ["https://chatgpt.com/*"] });
-  const removedAssistantName = String.fromCharCode(103, 101, 109, 105, 110, 105);
+async function chatTabs(provider = aiProvider) {
+  const config = providerConfig(provider);
+  const tabs = await chrome.tabs.query({ url: config.patterns });
   return tabs
-    .filter((tab) => tab.id && !String(tab.title || "").toLowerCase().includes(removedAssistantName))
+    .filter((tab) => tab.id)
     .map((tab) => ({
       tabId: tab.id,
-      title: tab.title || "ChatGPT",
-      url: tab.url || "https://chatgpt.com/",
+      title: tab.title || config.name,
+      url: tab.url || config.homeUrl,
+      aiProvider: provider,
       active: Boolean(tab.active),
       windowId: tab.windowId,
       lastAccessed: tab.lastAccessed || 0,
@@ -237,84 +284,92 @@ async function chatTabs() {
     .sort((a, b) => Number(b.active) - Number(a.active) || b.lastAccessed - a.lastAccessed);
 }
 
-async function ensureBridge(tabId) {
+async function ensureBridge(tabId, provider = aiProvider) {
+  const config = providerConfig(provider);
   try {
     const ping = await chrome.tabs.sendMessage(tabId, { type: "LOVABURST_CONTENT_PING" });
-    if (ping?.ok && ping.source === "chatgpt") return true;
+    if (ping?.ok && ping.source === config.pingSource) return true;
   } catch {}
-  await chrome.scripting.executeScript({ target: { tabId }, files: [BRIDGE] });
+  await chrome.scripting.executeScript({ target: { tabId }, files: [config.bridgeFile || BRIDGE] });
   const ping = await chrome.tabs.sendMessage(tabId, { type: "LOVABURST_CONTENT_PING" });
-  return Boolean(ping?.ok && ping.source === "chatgpt");
+  return Boolean(ping?.ok && ping.source === config.pingSource);
 }
 
-async function activateRelay(tabId) {
-  const response = await chrome.runtime.sendMessage({ type: "LOVABURST_LINK_CHATGPT", tabId });
+async function activateRelay(tabId, provider = aiProvider) {
+  const response = await chrome.runtime.sendMessage({ type: "LOVABURST_LINK_PROVIDER", provider, tabId });
   if (!response?.ok) throw new Error(response?.error || "Could not activate this conversation.");
 }
 
-async function sendDirect(tabId, prompt) {
-  if (!(await ensureBridge(tabId))) throw new Error("The ChatGPT bridge did not respond.");
-  const response = await chrome.tabs.sendMessage(tabId, { type: "LOVABURST_SUBMIT_TO_CHATGPT", prompt });
-  if (!response?.ok) throw new Error(response?.error || "ChatGPT did not confirm the submission.");
+async function sendDirect(tabId, prompt, provider = aiProvider) {
+  const config = providerConfig(provider);
+  if (!(await ensureBridge(tabId, provider))) throw new Error(`The ${config.name} bridge did not respond.`);
+  const response = await chrome.tabs.sendMessage(tabId, { type: config.submitMessage, prompt });
+  if (!response?.ok) throw new Error(response?.error || `${config.name} did not confirm the submission.`);
 }
 
 async function ownerOf(tab) {
   const all = await bindings();
   for (const [projectId, rec] of Object.entries(all)) {
     for (const conversation of rec?.conversations || []) {
+      if (tab.tabId && conversation.tabId === tab.tabId) return projectId;
       const lockedUrl = conversation.lockedUrl || conversation.url || "";
-      if (tab.url && lockedUrl && tab.url === lockedUrl) return projectId;
+      if (tab.url && lockedUrl && !isProviderNewUrl(conversation.aiProvider || "chatgpt", lockedUrl) && tab.url === lockedUrl) return projectId;
     }
   }
   return "";
 }
 
-async function linkTab(tabId) {
+async function linkTab(tabId, provider = aiProvider) {
+  const config = providerConfig(provider);
   const projectId = workspace.lovableProjectId;
   if (!projectId) throw new Error(`Open a ${workspace.platform === "base44" ? "Base44" : "Lovable"} project first.`);
 
   const tab = await chrome.tabs.get(tabId);
-  if (!tab?.id || !tab.url?.startsWith("https://chatgpt.com/")) {
-    throw new Error("The selected conversation is not a ChatGPT conversation.");
+  if (!tab?.id || !tab.url?.startsWith(`${config.origin}/`)) {
+    throw new Error(`The selected conversation is not a ${config.name} conversation.`);
   }
 
   const owner = await ownerOf({ tabId: tab.id, url: tab.url });
   if (owner && owner !== projectId) {
     throw new Error("This conversation is already linked to another LovaRPM project.");
   }
-  if (!(await ensureBridge(tab.id))) throw new Error("The LovaRPM bridge did not respond.");
+  if (!(await ensureBridge(tab.id, provider))) throw new Error(`The ${config.name} bridge did not respond.`);
 
   await update(projectId, (rec) => {
     const conversations = [...rec.conversations];
     let linked =
       conversations.find((item) => {
         const lockedUrl = item.lockedUrl || item.url || "";
-        return tab.url !== "https://chatgpt.com/" && lockedUrl === tab.url;
+        return (item.aiProvider || "chatgpt") === provider && !isProviderNewUrl(provider, tab.url) && lockedUrl === tab.url;
       });
 
     if (!linked) {
       linked = {
         id: makeId(),
+        aiProvider: provider,
         tabId: tab.id,
         url: tab.url,
-        title: tab.title || "ChatGPT",
+        title: tab.title || config.name,
         createdAt: now(),
         linkedAt: now(),
         contextSentAt: "",
-        lockedUrl: tab.url,
-        lockedTitle: tab.title || "ChatGPT",
+        lockedUrl: isProviderNewUrl(provider, tab.url) ? "" : tab.url,
+        lockedTitle: tab.title || config.name,
+        pendingNavigation: isProviderNewUrl(provider, tab.url),
       };
       conversations.push(linked);
     } else {
       linked = {
         ...linked,
+        aiProvider: provider,
         tabId: tab.id,
         url: tab.url,
-        title: tab.title || linked.title || "ChatGPT",
-        lockedUrl: tab.url,
-        lockedTitle: tab.title || linked.lockedTitle || linked.title || "ChatGPT",
+        title: tab.title || linked.title || config.name,
+        lockedUrl: isProviderNewUrl(provider, tab.url) ? "" : tab.url,
+        lockedTitle: tab.title || linked.lockedTitle || linked.title || config.name,
         linkedAt: now(),
         closedAt: "",
+        pendingNavigation: isProviderNewUrl(provider, tab.url),
       };
       conversations[conversations.findIndex((item) => item.id === linked.id)] = linked;
     }
@@ -325,15 +380,15 @@ async function linkTab(tabId) {
       repository: workspace.repository || rec.repository || "",
       sourceTitle: workspace.sourceTitle || rec.sourceTitle || "",
       sourceUrl: workspace.sourceUrl || rec.sourceUrl || "",
-      activeConversationId: linked.id,
+      ...setProviderConversation(rec, linked, provider),
       conversations: conversations.slice(-12),
     };
   });
 
-  await activateRelay(tab.id);
+  await activateRelay(tab.id, provider);
 }
 
-async function contextPrompt(rec) {
+async function contextPrompt(rec, provider = aiProvider) {
   const objectives = (rec?.recentObjectives || []).slice(-12);
   const integrations = (await chrome.storage.local.get("projectIntegrations")).projectIntegrations?.[rec?.projectId] || {};
   const supabase = integrations.supabase || {};
@@ -342,11 +397,13 @@ async function contextPrompt(rec) {
     : "No previous requests have been recorded locally by LovaRPM.";
 
   const platform = rec?.platform === "base44" ? "base44" : "lovable";
+  const conversation = active(rec, provider);
   const platformName = platform === "base44" ? "Base44" : "Lovable";
   const platformKey = platform === "base44" ? "BASE44_APP" : "LOVABLE_PROJECT";
   return [
     "[LOVABURST_PROJECT_CONTEXT_V2]",
     "MODE: PROJECT_CONTINUATION",
+    `AI_PROVIDER: ${providerName(conversation?.aiProvider || provider).toUpperCase()}`,
     `PLATFORM: ${platform.toUpperCase()}`,
     `${platformKey}: ${rec?.projectId || ""}`,
     `REPOSITORY: ${rec?.repository || "AUTO_NOT_DETECTED"}`,

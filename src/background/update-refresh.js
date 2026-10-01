@@ -1,4 +1,4 @@
-const INTEGRATION_URL_PATTERNS = ["https://lovable.dev/*", "https://app.base44.com/*", "https://chatgpt.com/*"];
+const INTEGRATION_URL_PATTERNS = ["https://lovable.dev/*", "https://app.base44.com/*", "https://chatgpt.com/*", "https://claude.ai/*"];
 const REFRESH_REASONS = new Set(["install", "update"]);
 
 async function refreshIntegrationTabs(reason) {

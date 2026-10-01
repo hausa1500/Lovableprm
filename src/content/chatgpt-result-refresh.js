@@ -123,6 +123,7 @@
     const stored = await chrome.storage.local.get(KEY);
     const statuses = stored[KEY] || {};
     const previous = statuses[candidate.projectId] || {};
+    if (previous.aiProvider && previous.aiProvider !== "chatgpt") return previous;
 
     if (
       previous.marker === candidate.marker &&
@@ -135,6 +136,7 @@
     const next = {
       ...previous,
       projectId: candidate.projectId,
+      aiProvider: "chatgpt",
       status: candidate.status,
       marker: candidate.marker,
       detectedAt: now,

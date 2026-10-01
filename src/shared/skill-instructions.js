@@ -219,12 +219,13 @@ export async function withPrmV5ImplementationContext(userRequest, context = {}) 
     integration.supabase?.projectRef || projectRecord.integrationContext?.supabaseProjectRef,
   );
   const platform = context.platform === "base44" ? "BASE44" : "LOVABLE";
+  const provider = context.aiProvider === "claude" ? "CLAUDE" : "CHATGPT";
   const requestId = cleanField(context.requestId) || `prm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const metadata = [
     "[PRM_BUILD_REQUEST_V5]",
     `REQUEST_ID: ${requestId}`,
     "MODE: IMPLEMENTATION",
-    "WRITER: CHATGPT_CONNECTED_GITHUB",
+    `WRITER: ${provider}_CONNECTED_GITHUB`,
     "EXECUTION_STRATEGY: INSPECT -> PLAN -> IMPLEMENT -> VERIFY -> REPAIR -> FINALIZE",
     "PROJECT_CONTEXT:",
     `PROJECT: ${projectName || "AUTO_NOT_DETECTED"}`,

@@ -69,24 +69,31 @@
     await chrome.storage.local.set({ projectChatBindings: bindings });
   }
 
-  async function activateChat(current) {
+  async function activateChat(current, requestedProvider) {
     const stored = await chrome.storage.local.get("projectChatBindings");
     const record = stored.projectChatBindings?.[current.lovableProjectId];
-    const conversation = record?.conversations?.find((item) => item.id === record.activeConversationId);
-    if (!conversation?.tabId) throw new Error("This project does not yet have an active ChatGPT conversation. Open the LovaRPM panel and connect one.");
-    const response = await chrome.runtime.sendMessage({ type: "LOVABURST_LINK_CHATGPT", tabId: conversation.tabId });
+    const provider = requestedProvider === "claude" || requestedProvider === "chatgpt"
+      ? requestedProvider
+      : stored.selectedAiProvider === "claude" ? "claude" : "chatgpt";
+    const conversationId = record?.activeConversationIds?.[provider] || record?.activeConversationId;
+    const conversation = record?.conversations?.find((item) => item.id === conversationId);
+    if (!conversation?.tabId || (conversation.aiProvider || "chatgpt") !== provider) {
+      throw new Error(`This project does not yet have an active ${provider === "claude" ? "Claude" : "ChatGPT"} conversation. Open the LovaRPM panel and connect one.`);
+    }
+    const response = await chrome.runtime.sendMessage({ type: "LOVABURST_LINK_PROVIDER", provider, tabId: conversation.tabId });
     if (!response?.ok) throw new Error(response?.error || "The linked conversation is unavailable.");
+    return provider;
   }
 
   async function submitObjective(objective, skills) {
     const current = await workspace();
     if (!current.lovableProjectId) throw new Error("Could not identify the Base44 app.");
     await rememberObjective(current, objective);
-    await activateChat(current);
+    const aiProvider = await activateChat(current, message.aiProvider);
     const response = await chrome.runtime.sendMessage({
       type: "LOVABURST_PROMPT_CAPTURED",
       source: SOURCE,
-      payload: { text: objective, url: location.href, title: document.title, capturedAt: new Date().toISOString(), repository: current.repository, lovableProjectId: current.lovableProjectId, platform: SOURCE, repositoryDetectionSource: current.detectionSource, skills },
+      payload: { text: objective, url: location.href, title: document.title, capturedAt: new Date().toISOString(), repository: current.repository, lovableProjectId: current.lovableProjectId, platform: SOURCE, repositoryDetectionSource: current.detectionSource, skills, aiProvider },
     });
     if (!response?.ok) throw new Error(response?.error || "Falha ao enviar o pedido.");
   }
