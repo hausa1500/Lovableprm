@@ -24,6 +24,9 @@
   ];
 
   const RESULT_MARKERS = Object.freeze({
+    "[PRM_DONE]": "done",
+    "[PRM_BLOCKED]": "blocked",
+    "[PRM_ERROR]": "error",
     "[LOVABURST_DONE]": "done",
     "[LOVABURST_BLOCKED]": "blocked",
     "[LOVABURST_ERROR]": "error",
@@ -31,7 +34,7 @@
     "[LOVARPM_BLOCKED]": "blocked",
     "[LOVARPM_ERROR]": "error",
   });
-  const REQUEST_MARKERS = ["[LOVABURST_REQUEST_V3]", "[LOVABURST_REQUEST_V2]", "[LOVABURST_REQUEST_V1]", "[LOVARPM_REQUEST_V3]", "[LOVARPM_REQUEST_V2]", "[LOVARPM_REQUEST_V1]"];
+  const REQUEST_MARKERS = ["[PRM_BUILD_REQUEST_V5]", "[LOVABURST_REQUEST_V3]", "[LOVABURST_REQUEST_V2]", "[LOVABURST_REQUEST_V1]", "[LOVARPM_REQUEST_V3]", "[LOVARPM_REQUEST_V2]", "[LOVARPM_REQUEST_V1]"];
   const isLovaRPMRequest = (text) => REQUEST_MARKERS.some((marker) => String(text || "").includes(marker));
   const PROJECT_ID_PATTERN = /(?:LOVABLE_PROJECT|BASE44_APP):\s*([A-Za-z0-9-]+)/i;
   const RUN_STATUS_STORAGE_KEY = "projectRunStatuses";
@@ -484,7 +487,7 @@
 
   function compactVisibleResponse(text) {
     return String(text || "")
-      .replace(/\[LOVABURST_(?:DONE|BLOCKED|ERROR)\]/g, "")
+      .replace(/\[(?:PRM|LOVABURST|LOVARPM)_(?:DONE|BLOCKED|ERROR)\]/g, "")
       .replace(/\n{3,}/g, "\n\n")
       .trim()
       .slice(-2200);
