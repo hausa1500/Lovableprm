@@ -252,20 +252,36 @@ async function resolveProjectProviderTab(projectId, provider) {
   if (!projectId || !globalThis.LovaRPMProviders?.[provider]) return null;
   const stored = await chrome.storage.local.get("projectChatBindings");
   const record = stored.projectChatBindings?.[projectId];
-  const conversationId = record?.activeConversationIds?.[provider] || record?.activeConversationId;
-  const conversation = record?.conversations?.find((item) => item.id === conversationId) || null;
+  const conversation = globalThis.LovaRPMProviders.resolveConversation(record, provider);
   if (!conversation || (conversation.aiProvider || "chatgpt") !== provider) return null;
   const config = globalThis.LovaRPMProviders[provider];
   const expectedUrl = String(conversation.lockedUrl || (!conversation.pendingNavigation ? conversation.url : "") || "").trim();
   if (conversation.tabId) {
     try {
       const tab = await chrome.tabs.get(conversation.tabId);
-      if (tab?.url?.startsWith(`${config.origin}/`) && (!expectedUrl || tab.url === expectedUrl || conversation.pendingNavigation)) return tab;
+      const sameConversation = expectedUrl && globalThis.LovaRPMProviders.sameConversation(provider, expectedUrl, tab?.url);
+      if (tab?.url?.startsWith(`${config.origin}/`) && (!expectedUrl || sameConversation || conversation.pendingNavigation)) {
+        if (!conversation.pendingNavigation && sameConversation && tab.url !== expectedUrl) {
+          const bindings = stored.projectChatBindings || {};
+          const currentRecord = bindings[projectId];
+          if (currentRecord) {
+            bindings[projectId] = {
+              ...currentRecord,
+              conversations: currentRecord.conversations.map((item) => item.id === conversation.id
+                ? { ...item, url: tab.url, lockedUrl: tab.url, title: tab.title || item.title, lockedTitle: tab.title || item.lockedTitle }
+                : item),
+            };
+            await chrome.storage.local.set({ projectChatBindings: bindings });
+          }
+        }
+        return tab;
+      }
     } catch {}
   }
   if (expectedUrl && !isProviderNewUrl(provider, expectedUrl)) {
-    const [tab] = await chrome.tabs.query({ url: [expectedUrl] });
-    if (tab?.id && tab.url?.startsWith(`${config.origin}/`)) return tab;
+    const tabs = await chrome.tabs.query({ url: config.patterns });
+    const tab = tabs.find((item) => globalThis.LovaRPMProviders.sameConversation(provider, expectedUrl, item.url));
+    if (tab?.id) return tab;
   }
   return null;
 }
@@ -515,8 +531,7 @@ async function accessBootstrapState(projectId, provider = "chatgpt") {
   if (!id) return { required: false, key: "" };
   const stored = await chrome.storage.local.get(["projectChatBindings", ACCESS_BOOTSTRAP_KEY]);
   const record = stored.projectChatBindings?.[id];
-  const conversationId = record?.activeConversationIds?.[provider] || record?.activeConversationId;
-  const conversation = record?.conversations?.find((item) => item.id === conversationId) || null;
+  const conversation = globalThis.LovaRPMProviders.resolveConversation(record, provider);
   if (conversation && (conversation.aiProvider || "chatgpt") !== provider) return { required: true, key: "" };
   const identity = String(conversation?.id || conversationId || conversation?.url || (conversation?.tabId ? `tab-${conversation.tabId}` : "")).trim();
   if (!identity) return { required: true, key: "" };
@@ -575,8 +590,7 @@ async function handleCapturedPrompt(message, sender) {
 
   const bindingStore = await chrome.storage.local.get("projectChatBindings");
   const projectBinding = bindingStore.projectChatBindings?.[lovableProjectId];
-  const activeConversationId = projectBinding?.activeConversationIds?.[aiProvider] || projectBinding?.activeConversationId;
-  const activeConversation = projectBinding?.conversations?.find((item) => item.id === activeConversationId);
+  const activeConversation = globalThis.LovaRPMProviders.resolveConversation(projectBinding, aiProvider);
   if (!activeConversation || (activeConversation.aiProvider || "chatgpt") !== aiProvider) {
     const providerName = globalThis.LovaRPMProviders?.[aiProvider]?.name || "AI provider";
     return { ok: false, error: `Connect a ${providerName} conversation to this project before sending.` };
@@ -740,8 +754,16 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         changed = true;
         return { ...conversation, tabId: null, pendingNavigation: false, closedAt: new Date().toISOString() };
       }
-      if (!conversation.pendingNavigation) return conversation;
       const isNew = isProviderNewUrl(provider, tab.url);
+      if (!conversation.pendingNavigation) {
+        const expectedUrl = conversation.lockedUrl || conversation.url || "";
+        if (globalThis.LovaRPMProviders.sameConversation(provider, expectedUrl, tab.url)) {
+          if (expectedUrl === tab.url && conversation.title === tab.title) return conversation;
+          changed = true;
+          return { ...conversation, url: tab.url, title: tab.title || conversation.title, lockedUrl: tab.url, lockedTitle: tab.title || conversation.lockedTitle };
+        }
+        return conversation;
+      }
       if (isNew) return conversation;
       changed = true;
       return { ...conversation, url: tab.url, title: tab.title || conversation.title, lockedUrl: tab.url, lockedTitle: tab.title || conversation.lockedTitle, pendingNavigation: false };

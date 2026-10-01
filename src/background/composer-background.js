@@ -62,9 +62,7 @@ async function activeProjectConversation(projectId, provider) {
   if (!projectId) return null;
   const stored = await chrome.storage.local.get(PROJECT_CHATS_KEY);
   const record = stored[PROJECT_CHATS_KEY]?.[projectId];
-  const conversationId = record?.activeConversationIds?.[provider] || record?.activeConversationId;
-  const conversation = record?.conversations?.find((item) => item.id === conversationId) || null;
-  return conversation && (conversation.aiProvider || "chatgpt") === provider ? conversation : null;
+  return globalThis.LovaRPMProviders?.resolveConversation(record, provider) || null;
 }
 
 async function resolveChatTab(conversation, provider) {
@@ -74,13 +72,14 @@ async function resolveChatTab(conversation, provider) {
   if (conversation.tabId) {
     try {
       const tab = await chrome.tabs.get(conversation.tabId);
-      if (tab?.url?.startsWith(`${config.origin}/`) && (!lockedUrl || tab.url === lockedUrl || conversation.pendingNavigation)) return tab;
+      const sameConversation = lockedUrl && globalThis.LovaRPMProviders.sameConversation(provider, lockedUrl, tab?.url);
+      if (tab?.url?.startsWith(`${config.origin}/`) && (!lockedUrl || sameConversation || conversation.pendingNavigation)) return tab;
     } catch {}
   }
   const tabs = await chrome.tabs.query({ url: config.patterns });
   if (lockedUrl && lockedUrl !== config.homeUrl && lockedUrl !== config.newUrl) {
-    const exact = tabs.find((tab) => tab.url === lockedUrl);
-    if (exact?.id) return exact;
+    const same = tabs.find((tab) => globalThis.LovaRPMProviders.sameConversation(provider, lockedUrl, tab.url));
+    if (same?.id) return same;
   }
   return null;
 }

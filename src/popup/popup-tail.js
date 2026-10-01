@@ -171,14 +171,6 @@ async function chooseChatTab(provider = aiProvider) {
 
   const projectId = workspace.lovableProjectId;
   const all = await bindings();
-  const ownership = new Map();
-  for (const [ownerProjectId, rec] of Object.entries(all)) {
-    for (const item of rec?.conversations || []) {
-      const lockedUrl = String(item.lockedUrl || item.url || "").trim();
-      if ((item.aiProvider || "chatgpt") === provider && lockedUrl && !isProviderNewUrl(provider, lockedUrl)) ownership.set(lockedUrl, ownerProjectId);
-    }
-  }
-
   return new Promise((resolve) => {
     const overlay = document.createElement("div");
     overlay.className = "lb-chat-picker";
@@ -188,7 +180,12 @@ async function chooseChatTab(provider = aiProvider) {
 
     const list = overlay.querySelector(".lb-chat-picker-list");
     for (const tab of tabs) {
-      const ownerProjectId = ownership.get(tab.url) || "";
+      const ownerProjectId = Object.entries(all).find(([, rec]) =>
+        (rec?.conversations || []).some((item) => {
+          const lockedUrl = String(item.lockedUrl || item.url || "").trim();
+          return (item.aiProvider || "chatgpt") === provider && lockedUrl && !isProviderNewUrl(provider, lockedUrl) && globalThis.LovaRPMProviders.sameConversation(provider, lockedUrl, tab.url);
+        }),
+      )?.[0] || "";
       const unavailable = Boolean(ownerProjectId && ownerProjectId !== projectId);
       const button = document.createElement("button");
       button.type = "button";

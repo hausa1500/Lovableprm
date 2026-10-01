@@ -125,7 +125,7 @@
         if ((item.aiProvider || "chatgpt") !== provider) return false;
         if (item.tabId === tab.id) return true;
         const lockedUrl = String(item.lockedUrl || item.url || "");
-        return !isNewProviderUrl(provider, lockedUrl) && lockedUrl === tab.url;
+        return !isNewProviderUrl(provider, lockedUrl) && globalThis.LovaRPMProviders.sameConversation(provider, lockedUrl, tab.url);
       });
       if (used) throw new Error("This conversation is already reserved for another project.");
     }
@@ -148,7 +148,7 @@
       if ((item.aiProvider || "chatgpt") !== provider) return false;
       if (item.tabId === tab.id) return true;
       const lockedUrl = String(item.lockedUrl || item.url || "");
-      return !isNewProviderUrl(provider, tab.url) && lockedUrl === tab.url;
+      return !isNewProviderUrl(provider, tab.url) && globalThis.LovaRPMProviders.sameConversation(provider, lockedUrl, tab.url);
     });
 
     if (!linked) {

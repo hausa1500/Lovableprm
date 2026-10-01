@@ -14,12 +14,12 @@ async function resolveChatTab(conversation) {
   if (conversation.tabId) {
     try {
       const tab = await chrome.tabs.get(conversation.tabId);
-      if (tab?.url?.startsWith("https://chatgpt.com/")) return tab;
+      if (tab?.url?.startsWith("https://chatgpt.com/") && globalThis.LovaRPMProviders.sameConversation("chatgpt", conversation.lockedUrl || conversation.url, tab.url)) return tab;
     } catch {}
   }
   const tabs = await chrome.tabs.query({ url: ["https://chatgpt.com/*"] });
   if (conversation.url && conversation.url !== "https://chatgpt.com/") {
-    const exact = tabs.find((tab) => tab.url === conversation.url);
+    const exact = tabs.find((tab) => globalThis.LovaRPMProviders.sameConversation("chatgpt", conversation.lockedUrl || conversation.url, tab.url));
     if (exact?.id) return exact;
   }
   const sameTitle = conversation.title ? tabs.filter((tab) => tab.title === conversation.title) : [];

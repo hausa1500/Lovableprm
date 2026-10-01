@@ -132,7 +132,10 @@ async function selectAiProvider(provider) {
   setLabel(ui.useOpen, `Use open ${name} conversation`);
   setLabel(ui.create, `Create new ${name} conversation`);
   setLabel(ui.useAnother, `Switch ${name} conversation`);
-  if (ui.open) ui.open.title = `Open linked ${name} conversation`;
+  if (ui.open) {
+    ui.open.textContent = `Open ${name} ↗`;
+    ui.open.title = `Open linked ${name} conversation`;
+  }
   if (ui.compactNew) ui.compactNew.title = `Create new ${name} conversation`;
   const brandDetails = document.querySelector(".brand-copy > span");
   if (brandDetails) brandDetails.textContent = `Lovable · Base44 · ${name} · GitHub`;
@@ -261,10 +264,7 @@ async function renderHistory() {
 }
 
 function active(rec, provider = aiProvider) {
-  const activeId = rec?.activeConversationIds?.[provider] || rec?.activeConversationId;
-  const conversation = rec?.conversations?.find((item) => item.id === activeId) || null;
-  if (conversation && (conversation.aiProvider || "chatgpt") === provider) return conversation;
-  return rec?.conversations?.find((item) => (item.aiProvider || "chatgpt") === provider) || null;
+  return globalThis.LovaRPMProviders?.resolveConversation(rec, provider) || null;
 }
 
 async function chatTabs(provider = aiProvider) {
@@ -313,7 +313,8 @@ async function ownerOf(tab) {
     for (const conversation of rec?.conversations || []) {
       if (tab.tabId && conversation.tabId === tab.tabId) return projectId;
       const lockedUrl = conversation.lockedUrl || conversation.url || "";
-      if (tab.url && lockedUrl && !isProviderNewUrl(conversation.aiProvider || "chatgpt", lockedUrl) && tab.url === lockedUrl) return projectId;
+      const provider = conversation.aiProvider || "chatgpt";
+      if (tab.url && lockedUrl && !isProviderNewUrl(provider, lockedUrl) && globalThis.LovaRPMProviders.sameConversation(provider, lockedUrl, tab.url)) return projectId;
     }
   }
   return "";
@@ -340,7 +341,7 @@ async function linkTab(tabId, provider = aiProvider) {
     let linked =
       conversations.find((item) => {
         const lockedUrl = item.lockedUrl || item.url || "";
-        return (item.aiProvider || "chatgpt") === provider && !isProviderNewUrl(provider, tab.url) && lockedUrl === tab.url;
+        return (item.aiProvider || "chatgpt") === provider && !isProviderNewUrl(provider, tab.url) && globalThis.LovaRPMProviders.sameConversation(provider, lockedUrl, tab.url);
       });
 
     if (!linked) {

@@ -74,8 +74,7 @@ async function skills(projectId) {
 async function chat(projectId, provider) {
   const stored = await chrome.storage.local.get("projectChatBindings");
   const record = stored.projectChatBindings?.[projectId];
-  const conversationId = record?.activeConversationIds?.[provider] || record?.activeConversationId;
-  const conversation = record?.conversations?.find((item) => item.id === conversationId);
+  const conversation = globalThis.LovaRPMProviders?.resolveConversation(record, provider);
   const config = globalThis.LovaRPMProviders?.[provider];
   if (!conversation || (conversation.aiProvider || "chatgpt") !== provider) throw new Error(`Connect a ${config?.name || "AI provider"} conversation before sending.`);
   const expectedUrl = String(conversation.lockedUrl || (!conversation.pendingNavigation ? conversation.url : "") || "").trim();
@@ -88,7 +87,7 @@ async function chat(projectId, provider) {
   }
 
   const tabs = await chrome.tabs.query({ url: config.patterns });
-  const exact = tabs.find((tab) => expectedUrl && tab.url === expectedUrl);
+  const exact = tabs.find((tab) => expectedUrl && globalThis.LovaRPMProviders.sameConversation(provider, expectedUrl, tab.url));
   if (exact) return exact;
   throw new Error("The linked ChatGPT conversation is unavailable.");
 }

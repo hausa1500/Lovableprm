@@ -19,12 +19,21 @@ async function resolveTab(conversation) {
   if (conversation.tabId) {
     try {
       const tab = await chrome.tabs.get(conversation.tabId);
-      if (tab?.url?.startsWith(`${config.origin}/`) && (!lockedUrl || tab.url === lockedUrl || conversation.pendingNavigation)) {
+      const sameConversation = lockedUrl && globalThis.LovaRPMProviders.sameConversation(provider, lockedUrl, tab?.url);
+      if (tab?.url?.startsWith(`${config.origin}/`) && (!lockedUrl || sameConversation || conversation.pendingNavigation)) {
         if (conversation.pendingNavigation && !isProviderNewUrl(provider, tab.url)) {
           await update(workspace.lovableProjectId, (rec) => ({
             ...rec,
             conversations: rec.conversations.map((item) => item.id === conversation.id
               ? { ...item, url: tab.url, title: tab.title || item.title, lockedUrl: tab.url, lockedTitle: tab.title || item.lockedTitle, pendingNavigation: false }
+              : item),
+          }));
+        }
+        if (!conversation.pendingNavigation && sameConversation && tab.url !== lockedUrl) {
+          await update(workspace.lovableProjectId, (rec) => ({
+            ...rec,
+            conversations: rec.conversations.map((item) => item.id === conversation.id
+              ? { ...item, url: tab.url, title: tab.title || item.title, lockedUrl: tab.url, lockedTitle: tab.title || item.lockedTitle }
               : item),
           }));
         }
@@ -35,7 +44,7 @@ async function resolveTab(conversation) {
 
   const tabs = await chrome.tabs.query({ url: config.patterns });
   if (lockedUrl && !isProviderNewUrl(provider, lockedUrl)) {
-    const byUrl = tabs.find((tab) => tab.url === lockedUrl);
+    const byUrl = tabs.find((tab) => globalThis.LovaRPMProviders.sameConversation(provider, lockedUrl, tab.url));
     if (byUrl?.tabId) return chrome.tabs.get(byUrl.tabId);
   }
 

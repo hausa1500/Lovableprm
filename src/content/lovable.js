@@ -359,10 +359,7 @@
       ? requestedProvider
       : stored.selectedAiProvider === "claude" ? "claude" : "chatgpt";
     const providerName = provider === "claude" ? "Claude" : "ChatGPT";
-    const conversationId = record?.activeConversationIds?.[provider] || record?.activeConversationId;
-    const conversation = record?.conversations?.find(
-      (item) => item.id === conversationId,
-    );
+    const conversation = globalThis.LovaRPMProviders?.resolveConversation(record, provider);
 
     if (!conversation?.tabId || (conversation.aiProvider || "chatgpt") !== provider) {
       throw new Error(`This project does not yet have an active ${providerName} conversation. Open the LovaRPM panel and link or create one.`);
