@@ -6,8 +6,9 @@
       const url = new URL(value);
       const parts = url.pathname.split("/").filter(Boolean);
       const route = provider === "chatgpt" ? "c" : "chat";
-      if (url.hostname !== (provider === "chatgpt" ? "chatgpt.com" : "claude.ai") || parts[0] !== route || !parts[1]) return "";
-      return `${provider}:${parts[1]}`;
+      const routeIndex = parts.lastIndexOf(route);
+      if (url.hostname !== (provider === "chatgpt" ? "chatgpt.com" : "claude.ai") || routeIndex < 0 || !parts[routeIndex + 1]) return "";
+      return `${provider}:${parts[routeIndex + 1]}`;
     } catch {
       return "";
     }
